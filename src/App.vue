@@ -158,8 +158,11 @@ function handleUserDropdownSelect(key: string | number) {
   }
 }
 
-onMounted(() => {
-  initAuth(); // 初始化驗證狀態
+const authReady = ref(false);
+
+onMounted(async () => {
+  await initAuth(); // 確保驗證狀態初始化完成
+  authReady.value = true; // 標記為就緒，此時才渲染 RouterView
 
   try {
     const stored = localStorage.getItem("moneyrecord-theme");
@@ -215,13 +218,17 @@ function onMenuUpdate(value: string | number): void {
 <template>
   <NConfigProvider :locale="zhTW" :date-locale="dateZhTW" :theme="naiveTheme" :theme-overrides="themeOverrides">
     <NMessageProvider>
-      <!-- 登入頁面不顯示 Layout -->
-      <div v-if="isLoginPage" class="login-wrapper">
-         <RouterView />
+      <div v-if="!authReady" style="height: 100vh; display: grid; place-items: center; background: var(--bg-body);">
+        <!-- 這裡可以放一個 loading 轉圈圈 -->
       </div>
+      <template v-else>
+        <!-- 登入頁面不顯示 Layout -->
+        <div v-if="isLoginPage" class="login-wrapper">
+          <RouterView />
+        </div>
 
-      <!-- 主應用程式 Layout -->
-      <NLayout v-else has-sider class="layout">
+        <!-- 主應用程式 Layout -->
+        <NLayout v-else has-sider class="layout">
         <NLayoutSider
           :class="['sider', { 'sider-collapsed': isSiderCollapsed }]"
           :collapsed="isSiderCollapsed"
@@ -337,7 +344,8 @@ function onMenuUpdate(value: string | number): void {
             </div>
           </NLayoutContent>
         </NLayout>
-      </NLayout>
+        </NLayout>
+      </template>
     </NMessageProvider>
   </NConfigProvider>
 </template>

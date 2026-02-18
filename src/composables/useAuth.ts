@@ -9,13 +9,12 @@ export function useAuth() {
    * 初始化 Auth 狀態監聽器
    * 在 App.vue 的 onMounted 呼叫一次即可
    */
-  function initAuth() {
+  async function initAuth() {
     // 1. 先取得當前的 Session
-    supabase.auth.getSession().then(({ data }) => {
-      user.value = data.session?.user ?? null;
-    });
+    const { data } = await supabase.auth.getSession();
+    user.value = data.session?.user ?? null;
 
-    // 2. 監聽 Session 變更 (登入、登出、Token 更新)
+    // 2. 監聽 Session 變更
     supabase.auth.onAuthStateChange((_event, session) => {
       user.value = session?.user ?? null;
     });
