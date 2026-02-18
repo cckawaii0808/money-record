@@ -1,0 +1,39 @@
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text-main);
+  font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  background:
+    radial-gradient(circle at 8% 8%, var(--bg-glow-1), transparent 30%),
+    radial-gradient(circle at 92% 4%, var(--bg-glow-2), transparent 32%),
+    var(--app-bg);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.n-layout-scroll-container {
+  min-height: 100vh;
+}
+
+.n-card {
+  border: 1px solid var(--line-soft);
+  box-shadow: var(--card-shadow);
+  background: var(--surface);
+}
+
+.n-data-table .n-data-table-th {
+  font-weight: 700;
+  color: var(--text-sub);
+  background: var(--table-header-bg);
+}
+
+.page-container {
+  box-sizing: border-box;
+  padding: clamp(16px, 2vw, 24px);
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
