@@ -25,11 +25,13 @@ export function useAuth() {
    * 會導向到 Google 登入頁面，登入成功後會跳轉回來
    */
   async function loginWithGoogle() {
+    // 自動根據當前環境生成跳轉路徑 (本地 dev 為 localhost, 正式為 github.io)
+    const redirectUrl = window.location.origin + import.meta.env.BASE_URL;
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        // 使用 Vite 的 BASE_URL (例如 /money-record/) 來構建正確的跳轉路徑
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`
+        redirectTo: redirectUrl
       }
     });
     if (error) {
