@@ -40,6 +40,7 @@ const router = createRouter({
 
 // 路由守衛：檢查是否已登入
 router.beforeEach(async (to, from, next) => {
+  // 從 window 物件同步獲取 authReady 狀態 (或簡單等待)
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   
   // 取得當前 Session
@@ -47,13 +48,19 @@ router.beforeEach(async (to, from, next) => {
   const isAuthenticated = !!data.session;
 
   if (requiresAuth && !isAuthenticated) {
-    // 未登入 -> 去登入頁
+    // 這裡多做一次嘗試：如果網址裡有 token 或 pkce code，等一下再判定
+    if (window.location.hash.includes('access_token') || window.location.search.includes('code=')) {
+      // 稍微延遲一下，讓 Supabase 完成 URL 解析
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const { data: retryData } = await supabase.auth.getSession();
+      if (retryData.session) {
+        return next();
+      }
+    }
     next("/login");
   } else if (to.path === "/login" && isAuthenticated) {
-    // 已登入 -> 去首頁
     next("/records");
   } else {
-    // 放行
     next();
   }
 });
