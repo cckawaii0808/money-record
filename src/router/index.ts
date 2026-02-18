@@ -40,29 +40,40 @@ const router = createRouter({
 
 // 路由守衛：檢查是否已登入
 router.beforeEach(async (to, from, next) => {
-  // 從 window 物件同步獲取 authReady 狀態 (或簡單等待)
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   
-  // 取得當前 Session
+  // 1. 取得當前 Session
   const { data } = await supabase.auth.getSession();
-  const isAuthenticated = !!data.session;
+  let isAuthenticated = !!data.session;
+
+  // 2. 處理 Auth 回調情況：
+  // 在 Hash 模式下,Supabase 的回調資訊(如 access_token)可能出現在 Hash 中
+  // 在 PKCE 模式下,code 可能出現在 Search (query) 中
+  const isAuthCallback = 
+    window.location.hash.includes('access_token') || 
+    window.location.hash.includes('type=recovery') ||
+    window.location.search.includes('code=');
 
   if (requiresAuth && !isAuthenticated) {
-    // 這裡多做一次嘗試：如果網址裡有 token 或 pkce code，等一下再判定
-    if (window.location.hash.includes('access_token') || window.location.search.includes('code=')) {
-      // 稍微延遲一下，讓 Supabase 完成 URL 解析
-      await new Promise(resolve => setTimeout(resolve, 800));
+    if (isAuthCallback) {
+      // 如果發現是回調路徑,給予 Supabase 一點時間解析 URL 並更新 Session 狀態
+      // 解析完成後 onAuthStateChange 會被觸發,但這裡我們手動等待並重試 getSession
+      await new Promise(resolve => setTimeout(resolve, 500));
       const { data: retryData } = await supabase.auth.getSession();
       if (retryData.session) {
         return next();
       }
     }
-    next("/login");
-  } else if (to.path === "/login" && isAuthenticated) {
-    next("/records");
-  } else {
-    next();
+    // 非回調路徑且未登入,跳轉至登入頁
+    return next("/login");
+  } 
+
+  // 3. 已登入狀態下訪問登入頁,跳轉至首頁
+  if (to.path === "/login" && isAuthenticated) {
+    return next("/records");
   }
+
+  next();
 });
 
 export { router };

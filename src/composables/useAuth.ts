@@ -29,7 +29,7 @@ export function useAuth() {
       provider: "google",
       options: {
         // 使用 Vite 的 BASE_URL (例如 /money-record/) 來構建正確的跳轉路徑
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}#/records`
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`
       }
     });
     if (error) {
