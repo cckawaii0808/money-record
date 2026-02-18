@@ -29,7 +29,8 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/records` // 登入後跳轉到記帳頁
+        // 使用目前頁面的完整的網址作為基準，確保在 GitHub Pages 子路徑下也能正確跳轉
+        redirectTo: new URL('records', window.location.href).href
       }
     });
     if (error) {
