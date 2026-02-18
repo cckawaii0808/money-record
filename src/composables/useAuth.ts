@@ -29,8 +29,8 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        // 使用目前頁面的完整的網址作為基準，確保在 GitHub Pages 子路徑下也能正確跳轉
-        redirectTo: new URL('records', window.location.href).href
+        // 使用 Vite 的 BASE_URL (例如 /money-record/) 來構建正確的跳轉路徑
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}records`
       }
     });
     if (error) {
