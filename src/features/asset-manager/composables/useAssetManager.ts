@@ -725,14 +725,15 @@ async function updateAccountById(accountId: string, updates: Partial<Pick<Accoun
 }
 
 /** 更新帳戶排序到 Supabase */
-async function reorderAccount(fromIndex: number, toIndex: number): Promise<void> {
+/** 更新帳戶排序到 Supabase */
+async function reorderAccount(fromIndex: number, toIndex: number): Promise<ActionResult> {
   const list = [...accounts.value]; // 複製一份
   if (
     fromIndex < 0 || fromIndex >= list.length ||
     toIndex < 0 || toIndex >= list.length ||
     fromIndex === toIndex
   ) {
-    return;
+    return { type: "success", message: "無需變更" };
   }
   
   // 本地先更新 UI，讓使用者覺得很快
@@ -747,14 +748,21 @@ async function reorderAccount(fromIndex: number, toIndex: number): Promise<void>
     sort_order: index
   }));
 
-  // Supabase 目前不支援一次 upsert 多個 id 來 update 不同欄位，只能 looping update 或用 SQL function
-  // 這裡為了簡單，我們只更新被移動的那個帳戶以及受影響的帳戶
-  // 為了效能，我們只對後端發送請求，如果不成功再倒退 (這裡簡化處理)
-  
-  // 批次更新策略：使用 upsert (需要包含所有必填欄位) 會有風險，
-  // 最好是用 RPC 或迴圈。這裡先用簡單的迴圈更新，量不大時還好。
-  for (const update of updates) {
-     await supabase.from("accounts").update({ sort_order: update.sort_order }).eq("id", update.id);
+  try {
+    // 使用 Promise.all 平行處理所有更新請求，提升效能
+    await Promise.all(
+      updates.map(update => 
+        supabase
+          .from("accounts")
+          .update({ sort_order: update.sort_order })
+          .eq("id", update.id)
+      )
+    );
+    return { type: "success", message: "排序已更新" };
+  } catch (err) {
+    console.error("Sorting error:", err);
+    // 如果失敗，理論上應該 rollback 本地狀態，但這裡暫不處理，下次重新整理會同步
+    return { type: "error", message: "排序儲存失敗" };
   }
 }
 

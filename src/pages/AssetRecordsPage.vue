@@ -299,7 +299,13 @@ function initSortable(el: HTMLElement | null, type: AccountType): Sortable | nul
         const globalTargetIndex = accounts.value.findIndex(a => a.id === targetVisualItem.id);
         
         // Call reorder.
-        reorderAccount(globalFromIndex, globalTargetIndex);
+        reorderAccount(globalFromIndex, globalTargetIndex).then((res) => {
+          if (res.type === 'success') {
+            message.success(res.message, { duration: 1000 });
+          } else {
+            message.error(res.message);
+          }
+        });
       }
     }
   });
@@ -1087,6 +1093,9 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
 
 .grid-item {
   min-width: 0; /* Prevent overflow in grid items */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 :deep(.liability-radio.n-radio-button--checked) {
