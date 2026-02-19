@@ -17,7 +17,8 @@ import {
   NGrid,
   NGi,
   NRadioGroup,
-  NRadioButton
+  NRadioButton,
+  NSkeleton
 } from "naive-ui";
 import { DATE_PICKER_YEAR_RANGE, TYPE_LABELS, categoryTagType } from "../constants";
 import { formatInteger } from "../utils/formatters";
@@ -48,8 +49,20 @@ const {
   addAccount,
   updateAccountById,
   reorderAccount,
-  deleteAccount
+  deleteAccount,
+  isLoading
 } = useAssetManager();
+
+const categoryOptions = [
+  { label: "生活費", value: "生活費" },
+  { label: "活期存款", value: "活期存款" },
+  { label: "現金", value: "現金" },
+  { label: "銀行帳戶", value: "銀行帳戶" },
+  { label: "股票", value: "股票" },
+  { label: "基金", value: "基金" },
+  { label: "信用卡", value: "信用卡" },
+  { label: "貸款", value: "貸款" }
+];
 
 const editingMonth = ref(selectedMonth.value);
 const draftAmountById = ref<Record<string, number>>({});
@@ -221,9 +234,23 @@ const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingAccountId = ref<string | null>(null);
 const editingName = ref("");
-const editingCategory = ref("");
+const editingCategory = ref<string | null>(null);
 const editingCurrency = ref<Currency>("TWD");
 const isSaving = ref(false);
+
+const newAccountCategoryProxy = computed({
+  get: () => newAccount.value.category || null,
+  set: (val: string | null) => {
+    newAccount.value.category = val || "";
+  }
+});
+
+const editingCategoryProxy = computed({
+  get: () => editingCategory.value || null,
+  set: (val: string | null) => {
+    editingCategory.value = val || null;
+  }
+});
 const isDeleting = ref(false);
 
 // Refactored: Instead of NGrid, let's use a custom grid container for better SortableJS compatibility.
@@ -359,7 +386,7 @@ async function handleAdd(): Promise<void> {
 function openEditModal(account: Account): void {
   editingAccountId.value = account.id;
   editingName.value = account.name;
-  editingCategory.value = account.category;
+  editingCategory.value = account.category || null;
   editingCurrency.value = account.currency;
   showEditModal.value = true;
   showDeleteConfirm.value = false; // Reset delete confirm state
@@ -371,7 +398,7 @@ async function handleEdit(): Promise<void> {
   try {
     const result = await updateAccountById(editingAccountId.value, {
       name: editingName.value,
-      category: editingCategory.value,
+      category: editingCategory.value || "",
       currency: editingCurrency.value
     });
     if (result.type === "success") {
@@ -453,8 +480,8 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
 
         <div class="divider-vertical"></div>
         
-        <NButton quaternary circle size="small" class="today-btn" @click="jumpToToday" title="回到本月">
-          今
+        <NButton  size="small" class="" @click="jumpToToday" title="回到本月">
+          今天
         </NButton>
       </div>
       
@@ -485,9 +512,29 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
           <div class="section-title">資產</div>
           <div class="section-line"></div>
         </div>
-        
+                <!-- Loading State: Skeleton -->
+        <div v-if="isLoading" class="card-grid">
+          <div v-for="i in 4" :key="i" class="grid-item">
+            <div class="record-card" style="pointer-events: none;">
+               <div class="card-header">
+                 <div class="header-left">
+                   <NSkeleton text style="width: 24px" />
+                   <NSkeleton circle style="width: 24px; height: 24px" />
+                 </div>
+                 <div class="header-info" style="width: 100%">
+                   <NSkeleton text style="width: 60%; margin-bottom: 4px" />
+                   <NSkeleton text style="width: 40%" />
+                 </div>
+               </div>
+               <div class="card-body">
+                 <NSkeleton text style="width: 100%; height: 34px; border-radius: 4px" />
+               </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Use a custom div container instead of NGrid to support SortableJS properly -->
-        <div ref="assetListContainer" class="card-grid">
+        <div v-else ref="assetListContainer" class="card-grid">
            <div v-for="(row, index) in assetRows" :key="row.id" class="grid-item">
             <div class="record-card">
               <div class="card-header">
@@ -558,7 +605,27 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
           <div class="section-line line-liability"></div>
         </div>
         
-        <div ref="liabilityListContainer" class="card-grid">
+        <div v-if="isLoading" class="card-grid">
+          <div v-for="i in 2" :key="i" class="grid-item">
+             <div class="record-card" style="pointer-events: none;">
+               <div class="card-header">
+                 <div class="header-left">
+                   <NSkeleton text style="width: 24px" />
+                   <NSkeleton circle style="width: 24px; height: 24px" />
+                 </div>
+                 <div class="header-info" style="width: 100%">
+                   <NSkeleton text style="width: 60%; margin-bottom: 4px" />
+                   <NSkeleton text style="width: 40%" />
+                 </div>
+               </div>
+               <div class="card-body">
+                 <NSkeleton text style="width: 100%; height: 34px; border-radius: 4px" />
+               </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-else ref="liabilityListContainer" class="card-grid">
            <div v-for="(row, index) in liabilityRows" :key="row.id" class="grid-item">
             <div class="record-card card-liability">
               <div class="card-header">
@@ -610,32 +677,76 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
       </div>
     </div>
 
-    <NModal v-model:show="showAddModal" preset="card" title="新增帳戶" :style="{ width: '380px' }">
-      <NSpace vertical :size="12">
-        <NInput v-model:value="newAccount.name" placeholder="帳戶名稱（例如：中信活儲）" />
-        <NInput v-model:value="newAccount.category" placeholder="分類（例如：生活費、核心投資）" />
-        <div style="display: flex; gap: 12px; align-items: center;">
-          <NRadioGroup v-model:value="newAccount.type" name="accountTypeGroup" size="medium" style="flex: 1; display: flex;">
-            <NRadioButton value="asset" label="資產" style="flex: 1; text-align: center;" />
-            <NRadioButton value="liability" label="負債" class="liability-radio" style="flex: 1; text-align: center;" />
-          </NRadioGroup>
-          <NSelect v-model:value="newAccount.currency" :options="currencyOptions" placeholder="幣別" style="flex: 1" />
+    <NModal v-model:show="showAddModal" preset="card" title="新增帳戶" :style="{ width: '420px' }">
+      <div class="modal-form">
+        <div class="form-row">
+          <label class="form-label">名稱</label>
+          <div class="form-control">
+            <NInput v-model:value="newAccount.name" placeholder="例如：中信活儲" />
+          </div>
         </div>
-      </NSpace>
+        
+        <div class="form-row">
+          <label class="form-label">分類</label>
+          <div class="form-control">
+            <NSelect 
+              v-model:value="newAccountCategoryProxy" 
+              filterable
+              tag
+              :options="categoryOptions"
+              placeholder="例如：生活費" 
+            />
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <label class="form-label">類型</label>
+          <div class="form-control group-control">
+            <NRadioGroup v-model:value="newAccount.type" name="accountTypeGroup" size="medium">
+              <NRadioButton value="asset" label="資產" />
+              <NRadioButton value="liability" label="負債" class="liability-radio" />
+            </NRadioGroup>
+            <NSelect v-model:value="newAccount.currency" :options="currencyOptions" placeholder="幣別" class="currency-select" />
+          </div>
+        </div>
+      </div>
       <template #footer>
         <NSpace justify="end">
           <NButton secondary :disabled="isSaving" @click="showAddModal = false">取消</NButton>
-          <NButton type="primary" :disabled="isSaving" :loading="isSaving" @click="handleAdd">確認新增</NButton>
+          <NButton type="primary" :disabled="isSaving" :loading="isSaving" @click="handleAdd">新增</NButton>
         </NSpace>
       </template>
     </NModal>
 
-    <NModal v-model:show="showEditModal" preset="card" title="編輯帳戶" :style="{ width: '380px' }">
-      <NSpace vertical :size="12">
-        <NInput v-model:value="editingName" placeholder="帳戶名稱" />
-        <NInput v-model:value="editingCategory" placeholder="分類" />
-        <NSelect v-model:value="editingCurrency" :options="currencyOptions" placeholder="幣別" />
-      </NSpace>
+    <NModal v-model:show="showEditModal" preset="card" title="編輯帳戶" :style="{ width: '420px' }">
+      <div class="modal-form">
+        <div class="form-row">
+          <label class="form-label">名稱</label>
+          <div class="form-control">
+            <NInput v-model:value="editingName" placeholder="帳戶名稱" />
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <label class="form-label">分類</label>
+          <div class="form-control">
+          <NSelect 
+              v-model:value="editingCategoryProxy" 
+              filterable
+              tag
+              :options="categoryOptions"
+              placeholder="例如：生活費" 
+            />
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <label class="form-label">幣別</label>
+          <div class="form-control">
+            <NSelect v-model:value="editingCurrency" :options="currencyOptions" placeholder="幣別" />
+          </div>
+        </div>
+      </div>
       <template #footer>
         <div class="edit-modal-footer">
           <NButton 
@@ -760,19 +871,6 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
   margin: 0 4px 0 8px;
 }
 
-.today-btn {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-sub);
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--line-soft);
-}
-
-.today-btn:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
 
 .toolbar-right {
   display: flex;
@@ -1166,7 +1264,56 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
 
 .add-text {
   font-size: 13px;
+
   font-weight: 600;
   transition: color 0.2s ease;
+}
+
+/* Modal Form Styles */
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 8px 0;
+}
+
+
+.form-row {
+  display: flex;
+  align-items: center;
+}
+
+.form-label {
+  width: 60px;
+  padding-right: 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-main);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.form-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.group-control {
+  display: flex;
+  gap: 12px;
+}
+
+.group-control :deep(.n-radio-group) {
+  flex: 1;
+  display: flex;
+}
+
+.group-control :deep(.n-radio-button) {
+  flex: 1; 
+  text-align: center;
+}
+
+.currency-select {
+  width: 110px;
 }
 </style>
