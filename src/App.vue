@@ -229,13 +229,16 @@ function onMenuUpdate(value: string | number): void {
 
         <!-- 主應用程式 Layout -->
         <NLayout v-else has-sider class="layout">
+        <!-- Mobile backdrop: closes sidebar when tapped -->
+        <div v-if="isMobile && !isSiderCollapsed" class="mobile-backdrop" @click="isSiderCollapsed = true" />
+
         <NLayoutSider
           :class="['sider', { 'sider-collapsed': isSiderCollapsed }]"
           :collapsed="isSiderCollapsed"
           collapse-mode="width"
-          :collapsed-width="64"
+          :collapsed-width="isMobile ? 0 : 64"
           :width="240"
-          show-trigger
+          :show-trigger="!isMobile"
           bordered
           content-style="display: flex; flex-direction: column; height: 100%; overflow: hidden;"
           @update:collapsed="(val: boolean) => isSiderCollapsed = val"
@@ -632,5 +635,36 @@ function onMenuUpdate(value: string | number): void {
 
 .user-avatar:hover {
   transform: scale(1.05);
+}
+
+/* ── Mobile ── */
+.mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+}
+
+@media (max-width: 1024px) {
+  /* Sidebar becomes a fixed overlay on mobile */
+  .sider {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh !important;
+    z-index: 100;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  }
+
+  /* Topbar compact */
+  .topbar {
+    padding: 8px 16px;
+  }
+
+  /* Hide user greeting text, keep avatar */
+  .user-greeting {
+    display: none;
+  }
 }
 </style>

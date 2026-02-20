@@ -18,7 +18,8 @@ import {
   NGi,
   NRadioGroup,
   NRadioButton,
-  NSkeleton
+  NSkeleton,
+  NPopselect
 } from "naive-ui";
 import { DATE_PICKER_YEAR_RANGE, TYPE_LABELS, categoryTagType } from "../constants";
 import { formatInteger } from "../utils/formatters";
@@ -64,8 +65,27 @@ const categoryOptions = [
   { label: "貸款", value: "貸款" }
 ];
 
+const gridCols = ref(4);
+const gridOptions = [
+  { label: '3欄', value: 3 },
+  { label: '4欄', value: 4 },
+  { label: '5欄', value: 5 },
+  { label: '6欄', value: 6 },
+  { label: '7欄', value: 7 },
+  { label: '8欄', value: 8 },
+];
+
+function updateGridCols(val: number) {
+  gridCols.value = val;
+  if(typeof localStorage !== 'undefined') {
+    localStorage.setItem('moneyrecord_grid_cols', String(val));
+  }
+}
+
 const editingMonth = ref(selectedMonth.value);
 const draftAmountById = ref<Record<string, number>>({});
+// 記錄上一次 buildDraft 時從 DB 讀到的值，用來判斷使用者是否真的改過
+const committedAmountById = ref<Record<string, number>>({});
 const showDeleteConfirm = ref(false); // Confirm dialog visibility
 
 const monthValue = computed<number | null>({
@@ -113,26 +133,27 @@ function jumpToToday() {
   editingMonth.value = `${year}-${month}`;
 }
 
-function formatAmount(amount: number): string {
-  return formatInteger(Math.max(0, amount));
+// TWD/JPY 不需要小數；USD 保留 2 位
+function currencyPrecision(currency: Currency): number {
+  return currency === "TWD" || currency === "JPY" ? 0 : 2;
 }
 
-function inputFormatter(value: string | number | null): string {
-  if (value === null || value === "") {
-    return "";
-  }
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) {
-    return "";
-  }
-  return formatAmount(numeric);
+function formatAmountForRow(value: number | null, currency: Currency): string {
+  if (value === null) return "";
+  const precision = currencyPrecision(currency);
+  return new Intl.NumberFormat("zh-TW", {
+    minimumFractionDigits: precision,
+    maximumFractionDigits: precision
+  }).format(Math.max(0, value));
 }
 
 function inputParser(value: string): number | null {
   if (!value) return null;
-  const clean = value.replace(/[^\d]/g, "");
-  if (!clean) return null;
-  return Number(clean);
+  // 移除格式化字符（逗號、貨幣符號等），但保留小數點
+  const clean = value.replace(/[^\d.]/g, "");
+  if (!clean || clean === ".") return null;
+  const num = Number(clean);
+  return Number.isFinite(num) ? num : null;
 }
 
 function buildDraft(): void {
@@ -141,9 +162,33 @@ function buildDraft(): void {
     nextAmounts[account.id] = amountAtMonth(account.id, editingMonth.value);
   }
   draftAmountById.value = nextAmounts;
+  // 同步更新「上次提交的值」，讓 accounts watcher 知道哪些是 DB 原始值
+  committedAmountById.value = { ...nextAmounts };
 }
 
-watch([accounts, editingMonth], buildDraft, { immediate: true, deep: true });
+// 切換月份 → 整包重建
+watch(editingMonth, buildDraft, { immediate: true });
+
+// accounts 變動（新增/刪除/排序）→ 智慧合併：只保留使用者真正改過的草稿
+watch(accounts, (newAccounts) => {
+  const nextAmounts: Record<string, number> = {};
+  const nextCommitted: Record<string, number> = {};
+  for (const account of newAccounts) {
+    const stored = amountAtMonth(account.id, editingMonth.value);
+    const committed = committedAmountById.value[account.id]; // 上次建立 draft 時的 DB 值
+    const draft = draftAmountById.value[account.id];
+    nextCommitted[account.id] = stored;
+    // 只有當 draft 跟上次 committed 不同時，才代表使用者真的改過
+    if (draft !== undefined && draft !== committed) {
+      nextAmounts[account.id] = draft;
+    } else {
+      // 沒改過（包含初始載入時 draft=0, committed=0 的情況）→ 用最新 DB 值
+      nextAmounts[account.id] = stored;
+    }
+  }
+  draftAmountById.value = nextAmounts;
+  committedAmountById.value = nextCommitted;
+}, { deep: true });
 
 function resetDraft(): void {
   buildDraft();
@@ -152,8 +197,9 @@ function resetDraft(): void {
 
 const isDirty = computed(() => {
   for (const account of accounts.value) {
-    const original = amountAtMonth(account.id, editingMonth.value);
-    const current = draftAmountById.value[account.id] ?? 0;
+    const precision = currencyPrecision(account.currency);
+    const original = Number(amountAtMonth(account.id, editingMonth.value).toFixed(precision));
+    const current = Number((draftAmountById.value[account.id] ?? 0).toFixed(precision));
     if (original !== current) {
       return true;
     }
@@ -165,17 +211,16 @@ async function saveAll(): Promise<void> {
   if (isSaving.value) return;
   isSaving.value = true;
   try {
-    const entries = accounts.value.map((account) => ({
-      accountId: account.id,
-      amount: Math.max(0, Math.round(draftAmountById.value[account.id] ?? 0))
-    }));
+    const entries = accounts.value.map((account) => {
+      const precision = currencyPrecision(account.currency);
+      const amount = Math.max(0, Number((draftAmountById.value[account.id] ?? 0).toFixed(precision)));
+      return { accountId: account.id, amount };
+    });
     const result = await bulkUpsertMonthlyRecords(editingMonth.value, entries);
     if (result.type === "success") {
       message.success(result.message, { duration: 1000 });
-      // Re-build draft to update "original" values so isDirty becomes false
-      // Actually, bulkUpsert updates the store, so amountAtMonth will change.
-      // But we need to wait for store update or manually trigger rebuild? 
-      // The watcher on `accounts` might handle it if store updates deeply.
+      // 存完後強制把 draft 同步成實際儲存的值，讓 isDirty 歸零
+      buildDraft();
       return;
     }
     message.error(result.message, { duration: 1000 });
@@ -194,6 +239,15 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
 
 onMounted(() => {
   window.addEventListener("beforeunload", handleBeforeUnload);
+  if(typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('moneyrecord_grid_cols');
+      if (saved) {
+         const val = parseInt(saved);
+         if (val >= 3 && val <= 8) {
+             gridCols.value = val;
+         }
+      }
+  }
 });
 
 // onBeforeUnmount is already used below for Sortable, we will merge the logic there or just add another hook (Vue supports multiple).
@@ -486,19 +540,29 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
       </div>
       
       <div class="toolbar-right">
+        <div class="grid-selector-btn">
+          <NPopselect :options="gridOptions" :value="gridCols" @update:value="updateGridCols" trigger="click" size="medium" scrollable>
+            <NButton secondary size="small">
+              <template #icon>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+              </template>
+              {{ gridCols }}欄
+            </NButton>
+          </NPopselect>
+        </div>
+
         <template v-if="isDirty">
           <NButton secondary size="small" @click="resetDraft">
-            <template #icon>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </svg>
-            </template>
             重置
           </NButton>
 
           <NButton type="primary" size="small" :disabled="accounts.length === 0 || isSaving" :loading="isSaving" @click="saveAll">
-            儲存變更
+            儲存
           </NButton>
         </template>
         
@@ -534,7 +598,8 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
         </div>
 
         <!-- Use a custom div container instead of NGrid to support SortableJS properly -->
-        <div v-else ref="assetListContainer" class="card-grid">
+        <!-- Pass the column count as a CSS variable -->
+        <div v-else ref="assetListContainer" class="card-grid" :style="{ '--cols': gridCols }">
            <div v-for="(row, index) in assetRows" :key="row.id" class="grid-item">
             <div class="record-card">
               <div class="card-header">
@@ -568,11 +633,12 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
                   v-model:value="draftAmountById[row.id]"
                   :min="0"
                   :step="100"
-                  :precision="0"
-                  size="medium" 
+                  :precision="currencyPrecision(row.currency)"
+                  size="medium"
                   :show-button="false"
                   :parse="inputParser"
-                  :format="inputFormatter"
+                  :format="(v) => formatAmountForRow(v, row.currency)"
+                  :input-props="{ inputmode: 'decimal', pattern: '[0-9.]*' }"
                   class="amount-input"
                   placeholder="0"
                 >
@@ -625,7 +691,7 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
           </div>
         </div>
 
-        <div v-else ref="liabilityListContainer" class="card-grid">
+        <div v-else ref="liabilityListContainer" class="card-grid" :style="{ '--cols': gridCols }">
            <div v-for="(row, index) in liabilityRows" :key="row.id" class="grid-item">
             <div class="record-card card-liability">
               <div class="card-header">
@@ -658,11 +724,12 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
                   v-model:value="draftAmountById[row.id]"
                   :min="0"
                   :step="100"
-                  :precision="0"
-                  size="medium" 
+                  :precision="currencyPrecision(row.currency)"
+                  size="medium"
                   :show-button="false"
                   :parse="inputParser"
-                  :format="inputFormatter"
+                  :format="(v) => formatAmountForRow(v, row.currency)"
+                  :input-props="{ inputmode: 'decimal', pattern: '[0-9.]*' }"
                   class="amount-input"
                   placeholder="0"
                 >
@@ -1133,25 +1200,136 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 639px) {
+  /* Toolbar: single row, hide column selector */
   .toolbar-container {
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-  }
-  
-  .toolbar-month, .toolbar-right {
-    justify-content: center;
-    width: 100%;
+    flex-direction: row;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
   }
-  
+
   .toolbar-month {
-    position: relative; /* Ensure z-index works if needed */
+    flex: 1;
+    min-width: 0;
+    position: relative;
+  }
+
+  .toolbar-right {
+    flex-wrap: nowrap;
   }
 
   .month-picker-wrapper {
-    margin: 0 8px; /* Add some spacing between arrows and picker */
+    margin: 0 4px;
+  }
+
+  /* Hide grid column selector on mobile (list view instead) */
+  .grid-selector-btn {
+    display: none;
+  }
+
+  /* ── Card grid → iOS-style grouped list ── */
+  .card-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid var(--line-soft);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .grid-item {
+    height: auto;
+    display: block;
+  }
+
+  /* Each card becomes a horizontal list row */
+  .record-card {
+    flex-direction: row;
+    align-items: center;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--line-soft);
+    padding: 10px 12px;
+    gap: 10px;
+    cursor: default;
+  }
+
+  .record-card:hover {
+    border: none;
+    border-bottom: 1px solid var(--line-soft);
+    box-shadow: none;
+  }
+
+  .card-liability:hover {
+    border: none;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  /* Last item (add card) has no bottom border */
+  .grid-item:last-child .record-card {
+    border-bottom: none;
+  }
+
+  /* Account info: shrinkable, bounded */
+  .card-header {
+    flex: 1 1 auto;
+    min-width: 100px;
+    max-width: 55%;
+  }
+
+  /* Amount input: takes remaining space, at least 150px */
+  .card-body {
+    flex: 1 1 150px;
+    min-width: 150px;
+  }
+
+  .seq-num {
+    display: none;
+  }
+
+  .bank-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+  }
+
+  /* Hide edit button on mobile */
+  .header-action {
+    display: none;
+  }
+
+  /* Add card: compact horizontal row */
+  .add-card {
+    border: none;
+    border-radius: 0;
+    flex-direction: row;
+    justify-content: center;
+    padding: 10px 12px;
+    gap: 8px;
+    min-height: 44px;
+    background-color: transparent;
+  }
+
+  .add-card:hover {
+    border: none;
+    transform: none;
+    box-shadow: none;
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+
+  .add-icon-wrapper {
+    width: 24px;
+    height: 24px;
+  }
+
+  .add-text {
+    font-size: 13px;
+  }
+
+  .section-container {
+    margin-bottom: 20px;
   }
 }
 
@@ -1177,14 +1355,8 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
 
 @media (min-width: 640px) {
   .card-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .card-grid {
-    grid-template-columns: repeat(4, 1fr);
+    /* Use CSS variable linked to user selection, default to 4 if not set */
+    grid-template-columns: repeat(var(--cols, 4), 1fr);
     gap: 16px;
   }
 }

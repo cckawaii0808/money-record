@@ -218,14 +218,14 @@ function handleExportTrend() {
           <template #header-extra>
             <NButton size="small" secondary @click="handleExportTrend">匯出 CSV</NButton>
           </template>
-          <NDataTable :columns="trendColumns" :data="trendRows" :pagination="{ pageSize: 12 }" size="small" />
+          <NDataTable :columns="trendColumns" :data="trendRows" :pagination="{ pageSize: 12 }" size="small" :scroll-x="480" />
         </NCard>
       </NGi>
 
       <!-- 明細表格 (左側) -->
       <NGi span="1 m:2 xl:3">
         <NCard :title="`明細（${selectedMonth}）`" bordered>
-          <NDataTable :columns="snapshotColumns" :data="accountSnapshotRows" :pagination="false" size="small" />
+          <NDataTable :columns="snapshotColumns" :data="accountSnapshotRows" :pagination="false" size="small" :scroll-x="680" />
         </NCard>
       </NGi>
 
@@ -239,7 +239,7 @@ function handleExportTrend() {
       <!-- 單一帳戶趨勢 (選中時顯示) -->
       <NGi v-if="selectedAccount" span="1 m:2 xl:4">
         <NCard :title="`單帳戶：${accountDisplayName(selectedAccount)}`" bordered>
-          <NDataTable :columns="singleAccountTrendColumns" :data="singleAccountTrendRows" :pagination="false" size="small" />
+          <NDataTable :columns="singleAccountTrendColumns" :data="singleAccountTrendRows" :pagination="false" size="small" :scroll-x="360" />
         </NCard>
       </NGi>
     </NGrid>

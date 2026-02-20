@@ -666,7 +666,7 @@ async function bulkUpsertMonthlyRecords(
     user_id: user.id,
     account_id: entry.accountId,
     month: month,
-    amount: Math.max(0, Math.round(entry.amount))
+    amount: Math.max(0, entry.amount)
   }));
 
   const { error } = await supabase

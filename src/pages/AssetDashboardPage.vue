@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { NButton, NCard, NDatePicker, NGrid, NGi, NTag, useMessage } from "naive-ui";
+import { NButton, NCard, NCheckbox, NDatePicker, NGrid, NGi, NTag, useMessage } from "naive-ui";
 import { ALLOCATION_PALETTE, DATE_PICKER_YEAR_RANGE } from "../constants";
 import { formatInteger } from "../utils/formatters";
 import AssetAllocationDonutChart from "../features/asset-manager/components/AssetAllocationDonutChart.vue";
@@ -198,23 +198,43 @@ const deltaToneClass = computed(() => {
   return "tone-flat";
 });
 
+const includeNegative = ref(false);
+
+// 負債用紅色系，資產沿用原本 palette
+const LIABILITY_PALETTE = ["#ef4444", "#f87171", "#fb923c", "#fbbf24", "#fca5a5"];
+
 const allocationRows = computed(() => {
-  const assets = accountSnapshotRows.value
-    .filter((row) => row.type === "asset" && row.netImpactTwd > 0)
-    .sort((a, b) => b.netImpactTwd - a.netImpactTwd);
-  const total = assets.reduce((sum, row) => sum + row.netImpactTwd, 0);
+  const all = accountSnapshotRows.value;
 
-  if (total <= 0) {
-    return [];
-  }
+  const assets = all.filter((r) => r.type === "asset" && r.netImpactTwd > 0);
+  const liabilities = includeNegative.value
+    ? all.filter((r) => r.type === "liability" && r.netImpactTwd < 0)
+    : [];
 
-  return assets.map((row, index) => ({
-    key: row.key,
-    label: row.accountName,
-    valueTwd: row.netImpactTwd,
-    share: (row.netImpactTwd / total) * 100,
-    color: ALLOCATION_PALETTE[index % ALLOCATION_PALETTE.length]
-  }));
+  // 排序：絕對值由大到小
+  const items = [...assets, ...liabilities].sort(
+    (a, b) => Math.abs(b.netImpactTwd) - Math.abs(a.netImpactTwd)
+  );
+
+  const total = items.reduce((sum, r) => sum + Math.abs(r.netImpactTwd), 0);
+  if (total <= 0) return [];
+
+  let assetIdx = 0;
+  let liabilityIdx = 0;
+
+  return items.map((row) => {
+    const isLiability = row.type === "liability";
+    const color = isLiability
+      ? LIABILITY_PALETTE[liabilityIdx++ % LIABILITY_PALETTE.length]
+      : ALLOCATION_PALETTE[assetIdx++ % ALLOCATION_PALETTE.length];
+    return {
+      key: row.key,
+      label: row.accountName,
+      valueTwd: row.netImpactTwd,
+      share: (Math.abs(row.netImpactTwd) / total) * 100,
+      color
+    };
+  });
 });
 
 function applyRangePreset(preset: RangePreset): void {
@@ -340,7 +360,10 @@ onMounted(() => {
       <NGi>
         <NCard class="panel-card chart-panel" :bordered="false">
           <template #header>
-            <div class="panel-title">資產佔比</div>
+            <div class="allocation-header">
+              <div class="panel-title">資產佔比</div>
+              <NCheckbox v-model:checked="includeNegative" size="small">含負債</NCheckbox>
+            </div>
           </template>
           <AssetAllocationDonutChart :rows="allocationRows" />
         </NCard>
@@ -458,6 +481,13 @@ onMounted(() => {
   font-size: 26px;
   font-weight: 800;
   color: var(--text-main);
+}
+
+.allocation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 @media (max-width: 900px) {
