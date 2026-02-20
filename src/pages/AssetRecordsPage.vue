@@ -19,7 +19,8 @@ import {
   NRadioGroup,
   NRadioButton,
   NSkeleton,
-  NPopselect
+  NPopselect,
+  NSwitch
 } from "naive-ui";
 import { DATE_PICKER_YEAR_RANGE, TYPE_LABELS, categoryTagType } from "../constants";
 import { formatInteger } from "../utils/formatters";
@@ -81,6 +82,8 @@ function updateGridCols(val: number) {
     localStorage.setItem('moneyrecord_grid_cols', String(val));
   }
 }
+
+const isDraggable = ref(false);
 
 const editingMonth = ref(selectedMonth.value);
 const draftAmountById = ref<Record<string, number>>({});
@@ -319,6 +322,7 @@ function initSortable(el: HTMLElement | null, type: AccountType): Sortable | nul
     group: type, // Use unique group name ('asset' or 'liability') to strictly prevent cross-dragging
     draggable: ".grid-item:not(.ignore-sort)", // Ignore the static Add Card
     animation: 200,
+    disabled: !isDraggable.value,
     ghostClass: "sortable-ghost",
     chosenClass: "sortable-chosen",
     dragClass: "sortable-drag",
@@ -401,6 +405,11 @@ watch(() => assetListContainer.value, (el) => {
 watch(() => liabilityListContainer.value, (el) => {
   if (liabilitySortable) liabilitySortable.destroy();
   liabilitySortable = initSortable(el, 'liability');
+});
+
+watch(() => isDraggable.value, (val) => {
+  if (assetSortable) assetSortable.option('disabled', !val);
+  if (liabilitySortable) liabilitySortable.option('disabled', !val);
 });
 
 // Also re-init if they are recreated (e.g. data load) - though with `ref` it should be stable.
@@ -555,6 +564,10 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
             </NButton>
           </NPopselect>
         </div>
+         <div class="drag-toggle">
+          <NText depth="3" style="font-size: 12px; font-weight: 600;">拖曳排序</NText>
+          <NSwitch v-model:value="isDraggable" size="small" />
+        </div>
 
         <template v-if="isDirty">
           <NButton secondary size="small" @click="resetDraft">
@@ -601,7 +614,7 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
         <!-- Pass the column count as a CSS variable -->
         <div v-else ref="assetListContainer" class="card-grid" :style="{ '--cols': gridCols }">
            <div v-for="(row, index) in assetRows" :key="row.id" class="grid-item">
-            <div class="record-card">
+            <div class="record-card" :class="{ 'is-draggable': isDraggable }">
               <div class="card-header">
                 <!-- Sequence and Icon Group -->
                 <div class="header-left">
@@ -693,7 +706,7 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
 
         <div v-else ref="liabilityListContainer" class="card-grid" :style="{ '--cols': gridCols }">
            <div v-for="(row, index) in liabilityRows" :key="row.id" class="grid-item">
-            <div class="record-card card-liability">
+            <div class="record-card card-liability" :class="{ 'is-draggable': isDraggable }">
               <div class="card-header">
                 <div class="header-left">
                   <span class="seq-num">#{{ index + 1 }}</span>
@@ -942,7 +955,16 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+}
+
+.drag-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 4px 10px;
+  border-radius: 20px;
 }
 
 .section-container {
@@ -987,12 +1009,16 @@ const accountCountLabel = computed(() => `帳戶 ${accounts.value.length}`);
     flex-direction: column;
     gap: 8px; /* Reduced gap */
     position: relative;
-    cursor: grab;
+    cursor: default;
     height: 100%;
     /* min-height removed */
   }
   
-  .record-card:active {
+  .record-card.is-draggable {
+    cursor: grab;
+  }
+  
+  .record-card.is-draggable:active {
     cursor: grabbing;
   }
 
