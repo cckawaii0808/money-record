@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build && cp dist/index.html dist/404.html",
-    "preview": "vite preview",
-    "type-check": "vue-tsc --noEmit"
+    "preview": "npm run build && wrangler dev",
+    "type-check": "vue-tsc --noEmit",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.96.0",
@@ -17,11 +18,13 @@
     "vue-router": "^4.5.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.25.4",
     "@types/node": "^22.13.10",
     "@types/sortablejs": "^1.15.9",
     "@vitejs/plugin-vue": "^5.2.1",
     "typescript": "^5.8.2",
     "vite": "^6.2.1",
-    "vue-tsc": "^2.2.8"
+    "vue-tsc": "^2.2.8",
+    "wrangler": "^4.68.0"
   }
 }
