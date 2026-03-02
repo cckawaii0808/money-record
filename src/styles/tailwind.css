@@ -1,0 +1,6 @@
+/* 
+ * Tailwind v4 入口 + PrimeUI 整合
+ * 讓 PrimeVue 的 semantic colors（primary、surface 等）可以用 Tailwind utility class
+ */
+@import "tailwindcss";
+@import "tailwindcss-primeui";

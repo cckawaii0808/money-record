@@ -1,49 +1,76 @@
-# 資產管理系統（Naive UI）
+# 資金記錄（MoneyRecord）
 
-這是一個用 Vue 3 + TypeScript + Naive UI + Vue Router 建立的前端原型，用來取代原本試算表流程。
+每個月記錄各帳戶金額，追蹤資產淨值的成長變化。
 
-## 核心能力
+## 技術架構
 
-- 多銀行/多帳戶管理（資產、負債）
-- 每月金額記錄（可新增與覆蓋同月資料）
-- 單帳戶與多帳戶的月度變化
-- 多帳戶加總折線圖（可選區間、折算 TWD）
-- 帳戶可設定暱稱（篩選與選單顯示短名稱）
-- 帳戶選單支援銀行 SVG 圖示（可擴充常見銀行）
-- 帳戶頁採卡片管理（每張卡可直接調整暱稱）
-- 儀表板顯示 KPI（總淨值、本月變化、資產、負債）
-- 同幣別合計（TWD / USD / JPY）
-- 匯率自動更新（可手動重抓），跨幣別折算為 TWD 比較
+| 類別      | 技術                                        |
+| --------- | ------------------------------------------- |
+| 框架      | Vue 3 + TypeScript + Vite                   |
+| UI 元件庫 | **PrimeVue 4**（Aura 主題）                 |
+| 樣式      | **Tailwind CSS v4** + `tailwindcss-primeui` |
+| 圖表      | **Chart.js**（透過 PrimeVue Chart 元件）    |
+| 後端 / DB | Supabase（PostgreSQL + Auth）               |
+| 路由      | Vue Router 4（Hash mode）                   |
 
-## 啟動
+## 快速開始
 
 ```bash
 npm install
 npm run dev
 ```
 
-## 資料位置
+> 需要 `.env` 設定 Supabase URL 與 Anon Key，詳見下方。
 
-- 初始帳戶與每月紀錄：`src/data.ts`
-- 入口組件（殼層與導覽）：`src/App.vue`
-- 路由：`src/router/index.ts`
-- 共用常數：`src/constants/index.ts`
-- 共用工具：`src/utils/formatters.ts`、`src/utils/monthUtils.ts`
-- 全域樣式：`src/styles/variables.css`、`src/styles/global.css`
-- 共享邏輯（composable）：`src/features/asset-manager/composables/useAssetManager.ts`
-- 共用元件：`src/features/asset-manager/components/`
-- 頁面：`src/pages/`
+## 環境變數
 
-## 頁面區分
+在專案根目錄建立 `.env`：
 
-- `/dashboard`：首頁儀表板（KPI + 快速新增入口 + 最近走勢 + 佔比圖）
-- `/records`：新增/更新每月記錄 + 批次編輯表格
-- `/analysis`：月度變化、帳戶拆解、單帳戶趨勢、可指定起訖月份查看「選取帳戶加總折線圖」
-- `/accounts`：帳戶卡片管理（新增帳戶、調整暱稱）
+```
+VITE_SUPABASE_URL=https://xxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+## 頁面說明
+
+| 路由         | 功能                                                       |
+| ------------ | ---------------------------------------------------------- |
+| `/dashboard` | 總覽：本月淨值 KPI、6 個月趨勢折線、資產佔比圓餅、本月明細 |
+| `/records`   | 每月記錄：月份切換 + 點擊帳戶直接編輯金額                  |
+| `/settings`  | 帳戶管理：新增、編輯、刪除帳戶                             |
 
 ## 操作流程
 
-1. 首次進入先看 `/dashboard`（先看健康度）
-2. 新增本月資料走 `/records`（記錄流程集中）
-3. 看單一/多帳戶變化走 `/analysis`
-4. 調整帳戶名稱與暱稱走 `/accounts`
+1. **每個月初** → 進入 `/records`，選月份，逐一點擊帳戶輸入最新金額
+2. **看總覽** → `/dashboard` 一眼掌握淨值、趨勢、佔比
+3. **調整帳戶** → `/settings` 新增或修改帳戶設定
+
+## 專案結構
+
+```
+src/
+├── pages/
+│   ├── LoginPage.vue          # 登入（Google OAuth）
+│   ├── DashboardPage.vue      # 總覽儀表板
+│   ├── RecordsPage.vue        # 每月記錄
+│   └── SettingsPage.vue       # 帳戶設定
+├── features/asset-manager/
+│   ├── composables/
+│   │   └── useAssetManager.ts # 核心資料邏輯（帳戶、記錄、計算）
+│   └── utils/
+│       └── bankIcons.ts       # 銀行 icon 對應
+├── styles/
+│   ├── tailwind.css           # Tailwind v4 入口 + PrimeUI plugin
+│   ├── variables.css          # 色盤 CSS 變數（淺色 / 深色模式）
+│   └── global.css             # 全域基礎樣式
+├── router/index.ts            # 路由 + 登入守衛
+├── supabase.ts                # Supabase client
+└── types.ts                   # TypeScript 型別定義
+```
+
+## 設計系統
+
+- **主色**：Indigo 靛藍紫（`#4f46e5`）— 沉穩信賴的 SaaS 質感
+- **背景**：Slate-100 灰白底（`#f1f5f9`）+ 純白卡片
+- **字型**：DM Sans（介面）/ DM Mono（數字金額）
+- **風格**：Notion / Stripe / Linear 淺色美學
