@@ -99,12 +99,16 @@ const assetAllocationList = computed(() => {
 });
 
 // --- KPI ---
-const latestTrend = computed(() => trendRows.value[trendRows.value.length - 1] ?? null);
-const netWorth   = computed(() => Math.round(latestTrend.value?.netTwd ?? 0));
-const totalAsset = computed(() => Math.round(latestTrend.value?.assetTwd ?? 0));
-const totalLiab  = computed(() => Math.round(latestTrend.value?.liabilityTwd ?? 0));
-const delta      = computed(() => Math.round(latestTrend.value?.delta ?? 0));
-const deltaPct   = computed(() => latestTrend.value?.pct ?? null);
+const selectedTrend = computed(() =>
+  trendRows.value.find(r => r.month === selectedMonth.value)
+  ?? trendRows.value[trendRows.value.length - 1]
+  ?? null
+);
+const netWorth   = computed(() => Math.round(selectedTrend.value?.netTwd ?? 0));
+const totalAsset = computed(() => Math.round(selectedTrend.value?.assetTwd ?? 0));
+const totalLiab  = computed(() => Math.round(selectedTrend.value?.liabilityTwd ?? 0));
+const delta      = computed(() => Math.round(selectedTrend.value?.delta ?? 0));
+const deltaPct   = computed(() => selectedTrend.value?.pct ?? null);
 const deltaPos   = computed(() => delta.value >= 0);
 const deltaSign  = (v: number) => v > 0 ? "+" : "";
 

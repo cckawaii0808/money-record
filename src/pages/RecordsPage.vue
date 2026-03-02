@@ -218,7 +218,7 @@ const fmtTwd = (v: number) =>
           :maxFractionDigits="2"
           :autofocus="true"
           fluid
-          inputClass="text-2xl font-bold text-right tabular-nums"
+          inputClass="text-2xl font-bold text-center tabular-nums"
         />
       </div>
       <template #footer>
