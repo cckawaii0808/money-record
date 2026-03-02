@@ -45,6 +45,7 @@ export interface AccountSnapshotRow {
   currency: Currency;
   current: number;
   delta: number;
+  deltaTwd: number;
   pct: number | null;
   netImpactTwd: number;
 }
@@ -579,6 +580,7 @@ const accountSnapshotRows = computed<AccountSnapshotRow[]>(() => {
       currency: account.currency,
       current,
       delta,
+      deltaTwd: toTwd(delta, account.currency),
       pct,
       netImpactTwd: toTwd(current * sign, account.currency)
     };

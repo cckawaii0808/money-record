@@ -10,7 +10,7 @@ import Skeleton from "primevue/skeleton";
 import { storeToRefs } from "pinia";
 import { useToast } from "primevue/usetoast";
 import { useAssetManagerStore } from "../stores";
-import type { MonthlyRecord } from "../types";
+import type { MonthlyRecord, Account } from "../types";
 
 const toast = useToast();
 const assetManager = useAssetManagerStore();

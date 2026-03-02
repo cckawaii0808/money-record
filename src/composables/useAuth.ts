@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { User } from "@supabase/supabase-js";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { supabase } from "../supabase";
 
 const user = ref<User | null>(null);
@@ -15,7 +15,7 @@ export function useAuth() {
     user.value = data.session?.user ?? null;
 
     // 2. 監聽 Session 變更
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       user.value = session?.user ?? null;
     });
   }
