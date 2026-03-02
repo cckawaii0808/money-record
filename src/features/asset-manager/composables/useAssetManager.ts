@@ -11,7 +11,8 @@ import {
   timestampToMonth
 } from "../../../utils/monthUtils";
 import { resolveBankIcon } from "../utils/bankIcons";
-import { supabase } from "../../../supabase";
+import { supabase, isMockMode } from "../../../supabase";
+import { seedAccounts, seedRecords } from "../../../data";
 
 // --- 介面定義 (Interfaces) ---
 
@@ -273,6 +274,15 @@ function accountDisplayName(account: Account): string {
 
 /** 從 Supabase 讀取帳戶列表 */
 async function fetchAccounts() {
+  if (isMockMode) {
+    accounts.value = seedAccounts;
+    // 更新選取的帳戶列表，預設全選
+    if (selectedAccountIds.value.length === 0) {
+      selectedAccountIds.value = accounts.value.map(a => a.id);
+    }
+    return;
+  }
+
   const { data, error } = await supabase
     .from("accounts")
     .select("*")
@@ -295,6 +305,11 @@ async function fetchAccounts() {
 
 /** 從 Supabase 讀取每月紀錄 */
 async function fetchRecords() {
+  if (isMockMode) {
+    records.value = seedRecords;
+    return;
+  }
+
   const { data, error } = await supabase
     .from("monthly_records")
     .select("account_id, month, amount");
