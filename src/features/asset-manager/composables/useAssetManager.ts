@@ -1,5 +1,6 @@
 import { computed, ref, watch } from "vue";
-import type { SelectOption } from "naive-ui";
+// SelectOption 本地定義取代 naive-ui 的版本
+interface SelectOption { label: string; value: string | number; }
 import { EARLIEST_SELECTABLE_MONTH } from "../../../constants";
 import type { Account, AccountType, Currency, MonthlyRecord } from "../../../types";
 import { formatCurrency, formatPct } from "../../../utils/formatters";
@@ -709,6 +710,18 @@ function selectLatestMonth(): void {
   selectedMonth.value = latest;
 }
 
+/** 更新帳戶資訊 (接受完整帳戶物件) */
+async function updateAccount(account: Account): Promise<void> {
+  const result = await updateAccountById(account.id, {
+    name: account.name,
+    category: account.category,
+    currency: account.currency
+  });
+  if (result.type === "error") {
+    throw new Error(result.message);
+  }
+}
+
 /** 更新帳戶資訊到 Supabase */
 async function updateAccountById(accountId: string, updates: Partial<Pick<Account, "name" | "category" | "currency">>): Promise<ActionResult> {
   const account = accounts.value.find((item) => item.id === accountId);
@@ -871,6 +884,7 @@ export function useAssetManager() {
     selectAllAccounts,
     selectLatestMonth,
     updateAccountById,
+    updateAccount,
     reorderAccount,
     deleteAccount, // Expose delete function
     initData // 導出初始化函式供外部手動呼叫
