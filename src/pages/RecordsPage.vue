@@ -4,6 +4,8 @@
  * 加入分類區塊、電腦版排版重構、Enter鍵儲存及輸入框調整
  */
 import { computed, ref } from "vue";
+import { useIsDesktop } from "../composables/useIsDesktop";
+const { isDesktop } = useIsDesktop();
 import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
 import Dialog from "primevue/dialog";
@@ -144,35 +146,41 @@ const fmtTwd = (v: number) =>
 
 <template>
   <div class="max-w-5xl mx-auto px-4 pt-4 sm:pt-6 pb-24 relative">
-    <!-- 月份選擇器 (獨立置中) -->
-    <div
-      class="flex justify-center mb-6 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:static sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent"
-    >
+    <!-- 月份選擇器：桌面版 Teleport 到 App.vue header，手機版 sticky -->
+    <Teleport defer to="#app-header-slot" :disabled="!isDesktop">
       <div
-        class="inline-flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-2xl shadow-sm border border-[var(--line-soft)]"
+        :class="
+          isDesktop
+            ? 'flex items-center justify-between w-full gap-4'
+            : 'flex justify-center mb-6 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4'
+        "
       >
-        <Button
-          icon="pi pi-chevron-left"
-          text
-          rounded
-          @click="goToPrevMonth"
-          :disabled="isFirst"
-          class="text-[var(--text-sub)] !p-2 h-10 w-10"
-        />
-        <span
-          class="w-36 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums"
-          >{{ selectedMonth }}</span
+        <h1 v-if="isDesktop" class="text-2xl font-bold text-[var(--text-main)] m-0">每月記錄</h1>
+        <div
+          class="inline-flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-2xl shadow-sm border border-[var(--line-soft)]"
         >
-        <Button
-          icon="pi pi-chevron-right"
-          text
-          rounded
-          @click="goToNextMonth"
-          :disabled="isLast"
-          class="text-[var(--text-sub)] !p-2 h-10 w-10"
-        />
+          <Button
+            icon="pi pi-chevron-left"
+            text
+            rounded
+            @click="goToPrevMonth"
+            :disabled="isFirst"
+            class="text-[var(--text-sub)] !p-2 h-10 w-10"
+          />
+          <span class="w-36 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums">
+            {{ selectedMonth }}
+          </span>
+          <Button
+            icon="pi pi-chevron-right"
+            text
+            rounded
+            @click="goToNextMonth"
+            :disabled="isLast"
+            class="text-[var(--text-sub)] !p-2 h-10 w-10"
+          />
+        </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Apollo KPI 摘要區 (分離的三張卡片) -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

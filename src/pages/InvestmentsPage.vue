@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
+import { useIsDesktop } from "../composables/useIsDesktop";
+const { isDesktop } = useIsDesktop();
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputNumber from "primevue/inputnumber";
@@ -271,40 +273,43 @@ onMounted(() => {
 
 <template>
   <div class="max-w-5xl mx-auto px-4 pt-4 sm:pt-6 pb-24 relative">
-    <!-- Header: Title & Toggle -->
-    <div
-      class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 lg:top-[80px] z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all"
-    >
-      <div class="flex items-center gap-3 flex-wrap">
-        <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">投資組合</h1>
-        <Button
-          icon="pi pi-sync"
-          rounded
-          text
-          class="!w-8 !h-8 text-[var(--text-sub)] hover:bg-[var(--line-soft)]"
-          :class="{ 'animate-spin': isRefreshingAll }"
-          @click="refreshPrices"
-          title="更新最新報價"
-        />
-        <Button
-          icon="pi pi-plus"
-          rounded
-          text
-          class="!w-8 !h-8 text-[var(--text-sub)] hover:bg-[var(--line-soft)]"
-          @click="openAdd"
-          title="新增投資"
-        />
-      </div>
-
+    <!-- Header: 桌面版 Teleport 到 App.vue header，手機版 sticky -->
+    <Teleport defer to="#app-header-slot" :disabled="!isDesktop">
       <div
-        class="flex items-center gap-3 bg-[var(--surface)] px-4 py-2 rounded-xl shadow-sm border border-[var(--line-soft)]"
+        :class="
+          isDesktop
+            ? 'flex items-center justify-between w-full gap-4'
+            : 'flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all'
+        "
       >
-        <span class="text-sm font-semibold text-[var(--text-sub)]"
-          >包含借券金額</span
+        <div class="flex items-center gap-3 flex-wrap">
+          <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">投資組合</h1>
+          <Button
+            icon="pi pi-sync"
+            rounded
+            text
+            class="!w-8 !h-8 text-[var(--text-sub)] hover:bg-[var(--line-soft)]"
+            :class="{ 'animate-spin': isRefreshingAll }"
+            @click="refreshPrices"
+            title="更新最新報價"
+          />
+          <Button
+            icon="pi pi-plus"
+            rounded
+            text
+            class="!w-8 !h-8 text-[var(--text-sub)] hover:bg-[var(--line-soft)]"
+            @click="openAdd"
+            title="新增投資"
+          />
+        </div>
+        <div
+          class="flex items-center gap-3 bg-[var(--surface)] px-4 py-2 rounded-xl shadow-sm border border-[var(--line-soft)]"
         >
-        <ToggleSwitch v-model="includeLoaned" />
+          <span class="text-sm font-semibold text-[var(--text-sub)]">包含借券金額</span>
+          <ToggleSwitch v-model="includeLoaned" />
+        </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Apollo KPI 摘要區 (橫向卡片) -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

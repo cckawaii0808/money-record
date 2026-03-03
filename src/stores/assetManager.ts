@@ -749,6 +749,18 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     return { type: "success", message: `已更新帳戶：${payload.name ?? account.name}` };
   }
 
+  /** 更新帳戶資訊到 Supabase（接受完整帳戶物件，失敗時拋出例外） */
+  async function updateAccount(account: Account): Promise<void> {
+    const result = await updateAccountById(account.id, {
+      name: account.name,
+      category: account.category,
+      currency: account.currency
+    });
+    if (result.type === "error") {
+      throw new Error(result.message);
+    }
+  }
+
   /** 更新帳戶排序到 Supabase */
   async function reorderAccount(fromIndex: number, toIndex: number): Promise<ActionResult> {
     const list = [...accounts.value]; // 複製一份
@@ -879,6 +891,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     selectAllAccounts,
     selectLatestMonth,
     updateAccountById,
+    updateAccount,
     reorderAccount,
     deleteAccount,
     initData

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useIsDesktop } from "../composables/useIsDesktop";
+const { isDesktop } = useIsDesktop();
 import Chart from "primevue/chart";
 import Skeleton from "primevue/skeleton";
 import Tag from "primevue/tag";
@@ -304,45 +306,46 @@ const donutOptions = computed(() => ({
   <div
     class="max-w-7xl mx-auto px-4 pt-4 sm:pt-6 pb-24 transition-all relative"
   >
-    <!-- 標題與月份選擇器 (Apollo 分開置頂) -->
-    <div
-      class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 lg:top-[80px] z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all"
-    >
-      <h1
-        class="text-2xl font-bold text-[var(--text-main)] m-0 hidden sm:block"
-      >
-        資產總覽
-      </h1>
-
+    <!-- 標題與月份選擇器：桌面版 Teleport 到 App.vue header，手機版 sticky -->
+    <Teleport defer to="#app-header-slot" :disabled="!isDesktop">
       <div
-        class="flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-xl shadow-sm border border-[var(--line-soft)]"
+        :class="
+          isDesktop
+            ? 'flex items-center justify-between w-full gap-4'
+            : 'flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all'
+        "
       >
-        <Button
-          icon="pi pi-chevron-left"
-          text
-          rounded
-          @click="goToPreviousMonth"
-          :disabled="!hasPreviousMonth"
-          class="text-[var(--text-sub)] !p-2 h-8 w-8"
-        />
-        <Select
-          v-model="selectedMonth"
-          :options="monthOptions"
-          optionLabel="label"
-          optionValue="value"
-          class="w-36 text-center border-none shadow-none focus:ring-0 bg-transparent text-sm font-bold text-[var(--text-main)]"
-          :pt="{ root: { class: 'bg-transparent border-none p-0' } }"
-        />
-        <Button
-          icon="pi pi-chevron-right"
-          text
-          rounded
-          @click="goToNextMonth"
-          :disabled="!hasNextMonth"
-          class="text-[var(--text-sub)] !p-2 h-8 w-8"
-        />
+        <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">資產總覽</h1>
+        <div
+          class="flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-xl shadow-sm border border-[var(--line-soft)]"
+        >
+          <Button
+            icon="pi pi-chevron-left"
+            text
+            rounded
+            @click="goToPreviousMonth"
+            :disabled="!hasPreviousMonth"
+            class="text-[var(--text-sub)] !p-2 h-8 w-8"
+          />
+          <Select
+            v-model="selectedMonth"
+            :options="monthOptions"
+            optionLabel="label"
+            optionValue="value"
+            class="w-36 text-center border-none shadow-none focus:ring-0 bg-transparent text-sm font-bold text-[var(--text-main)]"
+            :pt="{ root: { class: 'bg-transparent border-none p-0' } }"
+          />
+          <Button
+            icon="pi pi-chevron-right"
+            text
+            rounded
+            @click="goToNextMonth"
+            :disabled="!hasNextMonth"
+            class="text-[var(--text-sub)] !p-2 h-8 w-8"
+          />
+        </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- 頂部數據列 -->
     <!-- 頂部數據列：四個獨立的 Apollo Card -->

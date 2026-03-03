@@ -3,6 +3,8 @@
  * SettingsPage — 設定（PrimeVue + Tailwind）
  */
 import { ref, computed } from "vue";
+import { useIsDesktop } from "../composables/useIsDesktop";
+const { isDesktop } = useIsDesktop();
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputText from "primevue/inputtext";
@@ -12,12 +14,12 @@ import Divider from "primevue/divider";
 import ConfirmDialog from "primevue/confirmdialog";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
-import { useAssetManager } from "../features/asset-manager/composables/useAssetManager";
+import { useAssetManagerStore } from "../stores";
 import type { Account, AccountType, Currency } from "../types";
 
 const toast   = useToast();
 const confirm = useConfirm();
-const { isLoading, accounts, newAccount, addAccount, updateAccount, deleteAccount, accountDisplayName } = useAssetManager();
+const { isLoading, accounts, newAccount, addAccount, updateAccount, deleteAccount, accountDisplayName } = useAssetManagerStore();
 
 const assetAccounts = computed(() => accounts.value.filter(a => a.type === "asset"));
 const liabAccounts  = computed(() => accounts.value.filter(a => a.type === "liability"));
@@ -83,11 +85,13 @@ function confirmDelete(acc: Account) {
   <div class="max-w-2xl mx-auto px-4 pt-6 pb-24">
     <ConfirmDialog />
 
-    <!-- 頁首 -->
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-extrabold text-[var(--text-main)] m-0">設定</h1>
-      <Button label="新增帳戶" icon="pi pi-plus" size="small" @click="openAdd" />
-    </div>
+    <!-- 頁首：桌面版 Teleport 到 App.vue header，手機版維持原位 -->
+    <Teleport defer to="#app-header-slot" :disabled="!isDesktop">
+      <div :class="isDesktop ? 'flex items-center justify-between w-full' : 'flex items-center justify-between mb-6'">
+        <h1 class="text-2xl font-extrabold text-[var(--text-main)] m-0">設定</h1>
+        <Button label="新增帳戶" icon="pi pi-plus" size="small" @click="openAdd" />
+      </div>
+    </Teleport>
 
     <!-- 資產帳戶 -->
     <section>

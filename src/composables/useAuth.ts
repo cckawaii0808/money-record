@@ -3,6 +3,7 @@ import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { supabase } from "../supabase";
 
 const user = ref<User | null>(null);
+let _authSub: ReturnType<typeof supabase.auth.onAuthStateChange> | null = null;
 
 export function useAuth() {
   /**
@@ -14,8 +15,9 @@ export function useAuth() {
     const { data } = await supabase.auth.getSession();
     user.value = data.session?.user ?? null;
 
-    // 2. 監聽 Session 變更
-    supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    // 2. 清除舊的監聽器再重新訂閱，避免 HMR 或重複呼叫導致多重觸發
+    _authSub?.data.subscription.unsubscribe();
+    _authSub = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       user.value = session?.user ?? null;
     });
   }
