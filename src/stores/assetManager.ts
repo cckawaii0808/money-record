@@ -352,11 +352,18 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     fxError.value = "";
 
     try {
-      const response = await axios.get("https://open.er-api.com/v6/latest/TWD", {
+      const targetUrl = "https://open.er-api.com/v6/latest/TWD";
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+      const response = await axios.get(proxyUrl, {
         headers: { "Cache-Control": "no-cache" }
       });
 
-      const data = response.data as {
+      if (!response.data || !response.data.contents) {
+        throw new Error("代理伺服器未回傳內容");
+      }
+
+      const data = JSON.parse(response.data.contents) as {
         rates?: Record<string, number>;
         time_last_update_utc?: string;
       };

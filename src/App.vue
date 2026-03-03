@@ -2,13 +2,39 @@
 /**
  * App.vue — Money Record Theme Exact Match Layout
  */
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Toast from "primevue/toast";
 import { supabase } from "./supabase";
+import { useAuth } from "./composables/useAuth";
 
 const router = useRouter();
 const route = useRoute();
+
+// 取得登入狀態與使用者資訊
+const { user, initAuth } = useAuth();
+
+// 應用程式啟動時初始化 Auth 監聽器
+onMounted(() => {
+  initAuth();
+});
+
+// 計算 Google 頭像 URL（優先使用 avatar_url，其次 picture）
+const avatarUrl = computed(
+  () =>
+    user.value?.user_metadata?.avatar_url ||
+    user.value?.user_metadata?.picture ||
+    null,
+);
+
+// 計算顯示名稱（優先使用 full_name，其次 name，最後 email）
+const displayName = computed(
+  () =>
+    user.value?.user_metadata?.full_name ||
+    user.value?.user_metadata?.name ||
+    user.value?.email ||
+    "",
+);
 
 const showNav = computed(() => route.meta.requiresAuth === true);
 
@@ -189,18 +215,29 @@ async function logout() {
               資產總覽
             </div>
           </div>
-          <div class="flex items-center gap-4">
-            <div
-              class="hidden md:flex items-center bg-[var(--surface)] border border-[var(--line-soft)] rounded-full px-3 py-1 w-[250px]"
+          <!-- 使用者資訊區：顯示 Google 頭像與名稱 -->
+          <div class="flex items-center gap-3">
+            <!-- 顯示名稱 -->
+            <span
+              class="text-sm font-medium text-[var(--text-sub)] hidden sm:block"
             >
-              <i class="pi pi-search text-[var(--text-muted)] p-2"></i>
-              <input
-                type="text"
-                placeholder="Search"
-                class="border-none bg-transparent outline-none text-sm w-full"
-              />
+              {{ displayName }}
+            </span>
+            <!-- 頭像：有圖片用 img，否則用首字母 fallback -->
+            <img
+              v-if="avatarUrl"
+              :src="avatarUrl"
+              :alt="displayName"
+              referrerpolicy="no-referrer"
+              class="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-[var(--line-soft)]"
+            />
+            <div
+              v-else
+              class="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-bold text-white text-sm"
+              style="background: var(--primary)"
+            >
+              {{ displayName.charAt(0).toUpperCase() }}
             </div>
-            <div class="bg-orange-500 rounded-full w-9 h-9 ml-2 shrink-0"></div>
           </div>
         </header>
 

@@ -7,12 +7,14 @@ import InputText from "primevue/inputtext";
 import ToggleSwitch from "primevue/toggleswitch";
 import Checkbox from "primevue/checkbox";
 import AutoComplete from "primevue/autocomplete";
+import Tag from "primevue/tag";
 import { seedInvestments } from "../data";
 import {
   fetchStockPrice,
   fetchMultipleStockPrices,
-  searchStocks,
 } from "../services/stockApi";
+import { initStockCache } from "../services/stockListSync";
+import { searchStocksFromCache } from "../services/stockListApi";
 
 export interface Holding {
   id: string;
@@ -52,23 +54,37 @@ const editForm = ref<Holding>({
 
 let searchTimeout: any = null;
 
-async function onSearchStock(event: any) {
-  const query = event.query;
-
-  if (searchTimeout) {
-    clearTimeout(searchTimeout);
-  }
-
-  searchTimeout = setTimeout(async () => {
-    const rawResults = await searchStocks(query, editForm.value.market);
-    searchResults.value = rawResults;
-  }, 500);
+/**
+ * 搜尋股票：優先從記憶體快取即時搜尋（無延遲），
+ * 若快取尚未就緒才 fallback 到 Yahoo Finance API。
+ */
+function onSearchStock(event: any) {
+  searchResults.value = searchStocksFromCache(
+    event.query,
+    editForm.value.market,
+  );
 }
 
 const marketOptions = [
   { label: "台股 (TW)", value: "TW", currency: "TWD" },
   { label: "美股 (US)", value: "US", currency: "USD" },
 ];
+
+/** 選擇後顯示的代號（自動從 .code 或 .symbol 去後綴推算） */
+const selectedCode = computed(() => {
+  const sym = editForm.value.symbol;
+  if (!sym || typeof sym !== "object") return "";
+  return (
+    (sym as any).code ?? ((sym as any).symbol ?? "").replace(/\.(TW|TWO)$/i, "")
+  );
+});
+
+/** 選擇後顯示的中文名稱 */
+const selectedName = computed(() => {
+  const sym = editForm.value.symbol;
+  if (!sym || typeof sym !== "object") return "";
+  return (sym as any).name ?? "";
+});
 
 function openAdd() {
   isEditing.value = false;
@@ -247,6 +263,9 @@ async function onSymbolSelect(event: any) {
 
 onMounted(() => {
   refreshPrices();
+
+  // 背景嘗試升級至 Supabase 資料（不阻塞頁面，搜尋功能即時可用）
+  initStockCache();
 });
 </script>
 
@@ -256,7 +275,7 @@ onMounted(() => {
     <div
       class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 lg:top-[80px] z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all"
     >
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 flex-wrap">
         <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">投資組合</h1>
         <Button
           icon="pi pi-sync"
@@ -505,12 +524,38 @@ onMounted(() => {
             >股票名稱或代號</label
           >
           <div class="relative w-full">
+            <!-- 已選擇：顯示 chip，點 X 可清除重新搜尋 -->
+            <div
+              v-if="selectedCode"
+              class="flex items-center gap-2 px-3 h-10 border border-[var(--line-soft)] rounded-lg bg-white min-w-0"
+            >
+              <Tag
+                :value="selectedCode"
+                severity="secondary"
+                class="!text-[11px] !py-0.5 !px-1.5 font-mono shrink-0"
+              />
+              <span
+                class="text-sm font-bold text-slate-700 truncate flex-1 min-w-0"
+              >
+                {{ selectedName }}
+              </span>
+              <button
+                type="button"
+                class="shrink-0 text-gray-400 hover:text-gray-600 leading-none"
+                @click="editForm.symbol = ''"
+              >
+                <i class="pi pi-times text-xs"></i>
+              </button>
+            </div>
+
+            <!-- 未選擇：顯示搜尋框 -->
             <AutoComplete
+              v-else
               v-model="editForm.symbol"
               :suggestions="searchResults"
               @complete="onSearchStock"
               @item-select="onSymbolSelect"
-              optionLabel="symbol"
+              :optionLabel="(item) => `${item.code} ${item.name}`"
               placeholder="e.g. AAPL / 0050 / 台積電"
               inputClass="w-full !rounded-lg pr-8"
               class="w-full"
@@ -521,27 +566,36 @@ onMounted(() => {
               emptyMessage="找不到符合的項目"
             >
               <template #option="slotProps">
-                <div class="flex flex-col gap-0.5 max-w-full min-w-0 pr-2">
-                  <div
-                    class="flex justify-between items-center w-full gap-2 min-w-0"
-                  >
-                    <span class="font-bold text-sm truncate shrink min-w-0">{{
-                      slotProps.option.name
-                    }}</span>
+                <div
+                  class="flex items-center justify-between gap-2 w-full min-w-0 pr-1"
+                >
+                  <div class="flex items-center gap-2 min-w-0">
+                    <Tag
+                      :value="slotProps.option.code"
+                      severity="secondary"
+                      class="!text-[11px] !py-0.5 !px-1.5 font-mono"
+                    />
                     <span
-                      class="text-[10px] text-slate-500 font-medium shrink-0 bg-slate-100 px-1.5 py-0.5 rounded"
-                      >{{ slotProps.option.exch }}</span
+                      class="text-sm font-bold text-slate-700 truncate min-w-0"
                     >
+                      {{ slotProps.option.name }}
+                    </span>
                   </div>
-                  <span class="text-[11px] text-slate-400 font-mono truncate">{{
-                    slotProps.option.symbol
-                  }}</span>
+                  <Tag
+                    :value="slotProps.option.exch === 'TAI' ? '上市' : '上櫃'"
+                    :severity="
+                      slotProps.option.exch === 'TAI' ? 'info' : 'success'
+                    "
+                    rounded
+                    class="!text-[10px] !py-0 !px-1.5"
+                  />
                 </div>
               </template>
             </AutoComplete>
+
             <i
               v-if="isFetchingPrice"
-              class="pi pi-spinner animate-spin absolute right-3 top-[18px] -translate-y-[18px] text-gray-400"
+              class="pi pi-spinner animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
             ></i>
           </div>
         </div>
@@ -590,7 +644,7 @@ onMounted(() => {
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
             <label class="text-[13px] font-bold text-[var(--text-sub)]"
-              >目前市價 ({{ editForm.currency }})</label
+              >市價 ({{ editForm.currency }})</label
             >
             <InputNumber
               v-model="editForm.current_price"
@@ -603,7 +657,7 @@ onMounted(() => {
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-[13px] font-bold text-[var(--text-sub)]"
-              >現在市值 ({{ editForm.currency }})</label
+              >總市值 ({{ editForm.currency }})</label
             >
             <div
               class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-[9px] w-full text-right font-bold text-gray-700 select-none"
