@@ -312,43 +312,47 @@ const donutOptions = computed(() => ({
         :class="
           isDesktop
             ? 'grid grid-cols-3 items-center w-full'
-            : 'flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all'
+            : 'block text-center mb-6 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4'
         "
       >
-        <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">資產總覽</h1>
-        <div
-          :class="isDesktop ? 'flex justify-center' : ''"
+        <h1
+          v-if="isDesktop"
+          class="text-2xl font-bold text-[var(--text-main)] m-0"
         >
+          資產總覽
+        </h1>
         <div
-          class="flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-xl shadow-sm border border-[var(--line-soft)]"
+          :class="
+            isDesktop ? 'flex justify-center' : 'w-full flex justify-center'
+          "
         >
-          <Button
-            icon="pi pi-chevron-left"
-            text
-            rounded
-            @click="goToPreviousMonth"
-            :disabled="!hasPreviousMonth"
-            class="text-[var(--text-sub)] !p-2 h-8 w-8"
-          />
-          <Select
-            v-model="selectedMonth"
-            :options="monthOptions"
-            optionLabel="label"
-            optionValue="value"
-            class="w-36 text-center border-none shadow-none focus:ring-0 bg-transparent text-sm font-bold text-[var(--text-main)]"
-            :pt="{ root: { class: 'bg-transparent border-none p-0' } }"
-          />
-          <Button
-            icon="pi pi-chevron-right"
-            text
-            rounded
-            @click="goToNextMonth"
-            :disabled="!hasNextMonth"
-            class="text-[var(--text-sub)] !p-2 h-8 w-8"
-          />
+          <div
+            class="inline-flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-[20px] shadow-sm border border-[var(--line-soft)]"
+          >
+            <Button
+              icon="pi pi-chevron-left"
+              text
+              rounded
+              @click="goToPreviousMonth"
+              :disabled="!hasPreviousMonth"
+              class="text-[var(--text-sub)] !p-2 h-10 w-10"
+            />
+            <span
+              class="w-36 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums"
+            >
+              {{ selectedMonth }}
+            </span>
+            <Button
+              icon="pi pi-chevron-right"
+              text
+              rounded
+              @click="goToNextMonth"
+              :disabled="!hasNextMonth"
+              class="text-[var(--text-sub)] !p-2 h-10 w-10"
+            />
+          </div>
         </div>
-        </div>
-        <div></div>
+        <div v-if="isDesktop"></div>
       </div>
     </Teleport>
 

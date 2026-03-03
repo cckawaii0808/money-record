@@ -278,41 +278,59 @@ onMounted(() => {
       <div
         :class="
           isDesktop
-            ? 'flex items-center justify-between w-full gap-4'
-            : 'flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all'
+            ? 'grid grid-cols-3 items-center w-full'
+            : 'block text-center mb-6 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4'
         "
       >
-        <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">投資組合</h1>
+        <h1
+          v-if="isDesktop"
+          class="text-2xl font-bold text-[var(--text-main)] m-0"
+        >
+          投資組合
+        </h1>
+        <div
+          :class="
+            isDesktop
+              ? 'flex justify-center'
+              : 'w-full overflow-x-auto hide-scrollbar'
+          "
+        >
+          <div
+            class="inline-flex items-center gap-1.5 bg-[var(--surface)] px-2 py-1.5 rounded-[20px] shadow-sm border border-[var(--line-soft)] whitespace-nowrap min-w-max mx-auto"
+          >
+            <div class="flex items-center gap-2 px-2">
+              <span class="text-[13px] font-bold text-[var(--text-sub)]"
+                >包含借券</span
+              >
+              <ToggleSwitch v-model="includeLoaned" />
+            </div>
+            <div
+              class="w-px h-5 bg-[var(--line-soft)] mx-1 hidden sm:block"
+            ></div>
+            <Button
+              label="報價"
+              icon="pi pi-sync"
+              text
+              rounded
+              size="small"
+              severity="secondary"
+              :loading="isRefreshingAll"
+              @click="refreshPrices"
+              class="!px-3 font-bold text-[var(--text-main)]"
+            />
+            <Button
+              label="新增"
+              icon="pi pi-plus"
+              rounded
+              size="small"
+              @click="openAdd"
+              class="!px-3 font-bold"
+            />
+          </div>
+        </div>
+        <div v-if="isDesktop"></div>
       </div>
     </Teleport>
-
-    <!-- 頁面工具列：包含借券金額 + 更新報價 + 新增投資 -->
-    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-      <div class="flex flex-wrap items-center gap-3">
-        <div
-          class="flex items-center gap-2 bg-[var(--surface)] px-3 py-1.5 rounded-lg shadow-sm border border-[var(--line-soft)]"
-        >
-          <span class="text-sm font-semibold text-[var(--text-sub)]"
-            >包含借券金額</span
-          >
-          <ToggleSwitch v-model="includeLoaned" />
-        </div>
-        <Button
-          label="更新報價"
-          icon="pi pi-sync"
-          size="small"
-          severity="secondary"
-          :loading="isRefreshingAll"
-          @click="refreshPrices"
-        />
-      </div>
-      <Button
-        label="新增投資"
-        icon="pi pi-plus"
-        size="small"
-        @click="openAdd"
-      />
-    </div>
 
     <!-- Apollo KPI 摘要區 (橫向卡片) -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
