@@ -434,7 +434,6 @@ const fmtTwd = (v: number) =>
           {{ editAccount.currency }} · {{ selectedMonth }}
         </p>
 
-        <!-- 輸入框改為文字(無千分位符號格式化)、置中，並加上 Enter 觸發事件 -->
         <InputNumber
           v-model="editValue"
           :useGrouping="false"
@@ -443,6 +442,9 @@ const fmtTwd = (v: number) =>
           :autofocus="true"
           fluid
           inputClass="text-2xl font-bold text-center tabular-nums"
+          placeholder="0"
+          @focus="editValue === 0 ? (editValue = null) : null"
+          @blur="editValue === null ? (editValue = 0) : null"
           @keydown.enter="onInputEnter"
         />
       </div>

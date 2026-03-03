@@ -16,6 +16,7 @@ import {
 import { resolveBankIcon } from "../features/asset-manager/utils/bankIcons";
 import { supabase, isMockMode } from "../supabase";
 import { seedAccounts, seedRecords } from "../data";
+import axios from "axios";
 
 // --- 介面定義 (Interfaces) ---
 
@@ -351,14 +352,11 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     fxError.value = "";
 
     try {
-      const response = await fetch("https://open.er-api.com/v6/latest/TWD", {
-        cache: "no-store"
+      const response = await axios.get("https://open.er-api.com/v6/latest/TWD", {
+        headers: { "Cache-Control": "no-cache" }
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
 
-      const data = (await response.json()) as {
+      const data = response.data as {
         rates?: Record<string, number>;
         time_last_update_utc?: string;
       };

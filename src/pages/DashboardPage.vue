@@ -306,7 +306,7 @@ const donutOptions = computed(() => ({
   >
     <!-- 標題與月份選擇器 (Apollo 分開置頂) -->
     <div
-      class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:static sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent"
+      class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 lg:top-[80px] z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all"
     >
       <h1
         class="text-2xl font-bold text-[var(--text-main)] m-0 hidden sm:block"
