@@ -29,16 +29,21 @@ body {
   flex-direction: column;
 }
 
-/* 通用輔助 */
+/* Apollo 通用輔助 */
 .page-container {
-  max-width: 800px;
+  max-width: 1400px; /* Apollo 喜歡利用寬螢幕空間 */
   margin-inline: auto;
-  padding: 24px 16px 80px;
+  padding: 32px 32px 80px; /* 大面積留白 */
 }
 
 /* 數字 tabular(等寬) */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* 確保 Tailwind h1~h6 margins 歸零(重置預設) */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
 }
 
 /* 漲跌顏色 */
@@ -52,9 +57,30 @@ body {
   color: var(--text-sub);
 }
 
-/* 手機底部導覽留白 */
+/* 手機底部導覽留白 (很重要，保持手機操作體驗) */
 @media (max-width: 639px) {
   .page-container {
-    padding-bottom: 96px;
+    padding-top: 20px;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-bottom: 100px; /* 為底部導覽留出充足空間 */
   }
+}
+
+/* --- Apollo 風格通用卡片 (Utility Class) --- 
+   精確對位：無邊框(或極淡)、適度圓角(1rem/16px)、大 Padding、專屬陰影
+*/
+.apollo-card {
+  background: var(--surface);
+  /* 在極淺的佈局中，可以拿掉 solid border，完全依靠 shadow 界定，但保留透明邊框避免跳動 */
+  border: 1px solid transparent; 
+  border-radius: 1rem; /* Apollo 約 16px 圓角，不像我們之前抓的 24px 那麼巨型 */
+  box-shadow: var(--card-shadow);
+  padding: 1.5rem; /* 大 Padding 是關鍵 */
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.apollo-card:hover {
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06), 0 2px 5px rgba(0,0,0,0.04);
+  /* 移除預設的大幅度浮起，Apollo UI 更平穩 */
 }

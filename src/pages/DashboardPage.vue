@@ -301,389 +301,384 @@ const donutOptions = computed(() => ({
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 pt-6 pb-24 transition-all">
-    <!-- 原標題區 -->
-    <div class="mb-6">
-      <h1 class="text-3xl font-bold text-[var(--text-main)] tracking-tight m-0">
+  <div
+    class="max-w-7xl mx-auto px-4 pt-4 sm:pt-6 pb-24 transition-all relative"
+  >
+    <!-- 標題與月份選擇器 (Apollo 分開置頂) -->
+    <div
+      class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:static sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent"
+    >
+      <h1
+        class="text-2xl font-bold text-[var(--text-main)] m-0 hidden sm:block"
+      >
         資產總覽
       </h1>
+
+      <div
+        class="flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-xl shadow-sm border border-[var(--line-soft)]"
+      >
+        <Button
+          icon="pi pi-chevron-left"
+          text
+          rounded
+          @click="goToPreviousMonth"
+          :disabled="!hasPreviousMonth"
+          class="text-[var(--text-sub)] !p-2 h-8 w-8"
+        />
+        <Select
+          v-model="selectedMonth"
+          :options="monthOptions"
+          optionLabel="label"
+          optionValue="value"
+          class="w-36 text-center border-none shadow-none focus:ring-0 bg-transparent text-sm font-bold text-[var(--text-main)]"
+          :pt="{ root: { class: 'bg-transparent border-none p-0' } }"
+        />
+        <Button
+          icon="pi pi-chevron-right"
+          text
+          rounded
+          @click="goToNextMonth"
+          :disabled="!hasNextMonth"
+          class="text-[var(--text-sub)] !p-2 h-8 w-8"
+        />
+      </div>
     </div>
 
     <!-- 頂部數據列 -->
-    <!-- 數據面板：整合日期導覽與 KPI -->
-    <div v-if="isLoading" class="mb-8">
-      <Skeleton height="150px" borderRadius="16px" />
+    <!-- 頂部數據列：四個獨立的 Apollo Card -->
+    <div
+      v-if="isLoading"
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+    >
+      <Skeleton v-for="i in 4" :key="i" height="142px" borderRadius="16px" />
     </div>
 
     <div
       v-else
-      class="rounded-2xl border border-[var(--line-soft)] bg-[var(--surface)] shadow-sm mb-8 overflow-hidden"
+      class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
     >
-      <!-- 上半部：日期切換區 (極簡純文字風格) -->
-      <div
-        class="flex items-center justify-center p-6 border-b border-[var(--line-soft)] bg-transparent"
-      >
-        <div class="flex items-center gap-8">
-          <Button
-            icon="pi pi-chevron-left"
-            text
-            rounded
-            @click="goToPreviousMonth"
-            :disabled="!hasPreviousMonth"
-            class="text-[var(--primary)] !p-2 transition-all disabled:opacity-20 disabled:cursor-not-allowed hover:bg-[var(--primary)]/5"
-          />
-          <Select
-            v-model="selectedMonth"
-            :options="monthOptions"
-            optionLabel="label"
-            optionValue="value"
-            class="flex-1 border-none shadow-none focus:ring-0 bg-transparent cursor-pointer"
-            :pt="{
-              root: { class: 'bg-transparent border-none p-0' },
-              label: {
-                class:
-                  'text-center p-0 text-2xl font-black text-[var(--text-main)] hover:text-[var(--primary)] transition-all',
-              },
-              dropdown: { class: 'hidden' },
-              pcOverlay: {
-                class:
-                  'shadow-2xl rounded-2xl border border-[var(--line-soft)]',
-              },
-              option: { class: 'flex justify-center p-4 font-bold' },
-            }"
-          />
-          <Button
-            icon="pi pi-chevron-right"
-            text
-            rounded
-            @click="goToNextMonth"
-            :disabled="!hasNextMonth"
-            class="text-[var(--primary)] !p-2 transition-all disabled:opacity-20 disabled:cursor-not-allowed hover:bg-[var(--primary)]/5"
-          />
+      <!-- Card 1: 淨值 -->
+      <div class="apollo-card flex flex-col justify-between h-[142px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-2">
+            <span class="text-sm font-bold text-[var(--text-main)]"
+              >本月淨值</span
+            >
+            <span
+              class="text-3xl font-black text-[var(--text-main)] tabular-nums tracking-tight"
+              >{{ formatTwd(netWorth) }}</span
+            >
+          </div>
+          <!-- 示意小圖或空白 -->
+        </div>
+        <div>
+          <span
+            v-if="deltaPct != null"
+            class="text-sm font-bold tabular-nums"
+            :class="
+              delta >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
+            "
+          >
+            {{ deltaPct.toFixed(1) }}%
+            <i
+              :class="delta >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"
+              class="text-[10px]"
+            ></i>
+          </span>
+          <span
+            v-else
+            class="text-sm font-bold tabular-nums text-[var(--text-sub)]"
+            >N/A</span
+          >
         </div>
       </div>
 
-      <!-- 下半部：KPI 數據 (四格置中立線) -->
-      <div
-        class="grid grid-cols-2 md:grid-cols-4 divide-x divide-[var(--line-soft)] border-t border-[var(--line-soft)] md:border-t-0"
-      >
-        <!-- 淨值 (強調顯示) -->
-        <div
-          class="flex flex-col items-center py-6 px-4 gap-1 group transition-all hover:bg-[var(--primary)]/5"
-        >
-          <span
-            class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-[0.2em]"
-            >本月淨值</span
-          >
-          <div class="flex flex-col items-center">
-            <span
-              class="text-2xl md:text-3xl font-black tabular-nums text-[var(--primary)] transition-transform group-hover:scale-105 duration-300"
+      <!-- Card 2: 本月異動 -->
+      <div class="apollo-card flex flex-col justify-between h-[142px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-2">
+            <span class="text-sm font-bold text-[var(--text-main)]"
+              >本月異動</span
             >
-              {{ formatTwd(netWorth) }}
+            <span
+              class="text-3xl font-black tabular-nums tracking-tight text-[var(--text-main)]"
+            >
+              {{ formatTwd(delta) }}
             </span>
           </div>
         </div>
-
-        <!-- 本月異動 (新增獨立欄位) -->
-        <div
-          class="flex flex-col items-center py-6 px-4 gap-1 group transition-all hover:bg-[var(--text-main)]/5"
-        >
+        <div>
           <span
-            class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-[0.2em]"
-            >本月異動</span
+            class="text-sm font-bold tabular-nums flex items-center gap-1"
+            :class="
+              delta >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
+            "
           >
-          <div class="flex flex-col items-center">
-            <span
-              class="text-xl md:text-2xl font-black tabular-nums transition-colors"
-              :class="
-                delta >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'
-              "
+            {{ delta >= 0 ? "+" : "" }}{{ formatTwd(delta) }}
+            <i
+              :class="delta >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"
+              class="text-[10px]"
+            ></i>
+          </span>
+        </div>
+      </div>
+
+      <!-- Card 3: 總資產 -->
+      <div class="apollo-card flex flex-col justify-between h-[142px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-2">
+            <span class="text-sm font-bold text-[var(--text-main)]"
+              >總資產</span
             >
-              {{ delta >= 0 ? "+" : "" }}{{ formatTwd(delta) }}
-            </span>
-            <div v-if="deltaPct != null" class="flex items-center gap-1 mt-0.5">
-              <i
-                :class="[
-                  delta >= 0
-                    ? 'pi pi-arrow-up-right text-[var(--positive)]'
-                    : 'pi pi-arrow-down-right text-[var(--negative)]',
-                ]"
-                class="text-[10px]"
-              />
-              <span
-                class="text-[11px] font-bold tabular-nums"
-                :class="
-                  delta >= 0
-                    ? 'text-[var(--positive)]'
-                    : 'text-[var(--negative)]'
-                "
-              >
-                {{ deltaPct.toFixed(1) }}%
-              </span>
-            </div>
             <span
-              v-else
-              class="text-[11px] font-bold text-[var(--text-sub)] opacity-50"
-              >N/A</span
+              class="text-3xl font-black text-[var(--text-main)] tabular-nums tracking-tight"
+              >{{ formatTwd(totalAsset) }}</span
             >
           </div>
         </div>
-
-        <!-- 總資產 -->
-        <div
-          class="flex flex-col items-center py-6 px-4 gap-1 group transition-all hover:bg-[var(--positive)]/5 border-t border-[var(--line-soft)] md:border-t-0"
-        >
-          <span
-            class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-[0.2em]"
-            >資產合計</span
-          >
-          <div class="flex flex-col items-center">
-            <span
-              class="text-xl md:text-2xl font-black tabular-nums text-[var(--positive)] opacity-90 group-hover:opacity-100 transition-all"
-            >
-              {{ formatTwd(totalAsset) }}
-            </span>
-          </div>
+        <div>
+          <span class="text-sm font-bold text-[var(--text-sub)]">資產總計</span>
         </div>
+      </div>
 
-        <!-- 總負債 -->
-        <div
-          class="flex flex-col items-center py-6 px-4 gap-1 group transition-all hover:bg-[var(--negative)]/5 border-t border-[var(--line-soft)] md:border-t-0"
-        >
-          <span
-            class="text-[10px] font-extrabold text-[var(--text-sub)] uppercase tracking-[0.2em]"
-            >負債合計</span
-          >
-          <div class="flex flex-col items-center">
-            <span
-              class="text-xl md:text-2xl font-black tabular-nums text-[var(--negative)] opacity-90 group-hover:opacity-100 transition-all"
+      <!-- Card 4: 總負債 -->
+      <div class="apollo-card flex flex-col justify-between h-[142px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-2">
+            <span class="text-sm font-bold text-[var(--text-main)]"
+              >總負債</span
             >
-              {{ formatTwd(totalLiab) }}
-            </span>
+            <span
+              class="text-3xl font-black text-[var(--text-main)] tabular-nums tracking-tight"
+              >{{ formatTwd(totalLiab) }}</span
+            >
+          </div>
+          <div
+            class="w-[60px] h-[60px] rounded-full border-[3px] border-[var(--primary)] flex items-center justify-center"
+          >
+            <span class="text-xs font-bold text-[var(--text-sub)]">負債</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- 儀表板網格系統 -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-      <!-- 左側主視窗 (手機版排在第 2) -->
-      <div class="lg:col-span-8 flex flex-col gap-8 order-2 lg:order-1">
-        <!-- 趨勢折線圖 -->
-        <Card
-          class="shadow-sm border border-[var(--line-soft)]"
-          :pt="{ content: { class: 'p-0' } }"
-        >
-          <template #title>
-            <div class="px-6 pt-4 flex items-center justify-between">
-              <span class="text-lg font-bold text-[var(--text-main)]"
-                >近 6 個月趨勢</span
-              >
-            </div>
-          </template>
-          <template #content>
-            <Skeleton v-if="isLoading" height="300px" borderRadius="10px" />
-            <div v-else class="h-[300px] w-full">
-              <Chart
-                type="line"
-                :data="trendData"
-                :options="trendOptions"
-                @select="onTrendSelect"
-                class="h-full"
-              />
-            </div>
-          </template>
-        </Card>
-
-        <!-- 本月明細 (使用 DataTable 取代手動寫) -->
-        <Card
-          class="shadow-sm border border-[var(--line-soft)] overflow-hidden"
-          :pt="{ body: { class: 'p-0' } }"
-        >
-          <template #title>
-            <div
-              class="p-6 border-b border-[var(--line-soft)] bg-[var(--app-bg)]/30"
+    <!-- 儀表板圖表網格：趨勢與比例 -->
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6 items-start">
+      <!-- Trend Chart (Spans 2 columns) -->
+      <div class="xl:col-span-2 apollo-card flex flex-col h-[400px]">
+        <div class="flex items-center justify-between mb-6">
+          <span class="text-[17px] font-bold text-[var(--text-main)]"
+            >近 6 個月趨勢</span
+          >
+          <div class="flex gap-2">
+            <button
+              class="bg-[var(--app-bg)] text-[var(--text-sub)] text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-[var(--line-soft)] transition-colors"
             >
-              <span class="text-lg font-bold text-[var(--text-main)]"
-                >本月綜合明細</span
-              >
-            </div>
-          </template>
-          <template #content>
-            <DataTable
-              :value="detailedSnapshotRows"
-              class="w-full text-sm"
-              dataKey="key"
-              :loading="isLoading"
-              stripedRows
-              responsiveLayout="scroll"
-            >
-              <Column header="帳戶" class="w-full">
-                <template #body="{ data }">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <Tag
-                      :value="data.type === 'asset' ? '資' : '債'"
-                      :severity="data.type === 'asset' ? 'success' : 'warn'"
-                      class="text-[10px] py-0.5 px-2 shrink-0 rounded-md shadow-sm"
-                    />
-                    <span
-                      class="text-base font-bold text-[var(--text-main)] truncate"
-                      >{{ data.accountName }}</span
-                    >
-                  </div>
-                </template>
-              </Column>
-              <Column header="餘額" class="text-right">
-                <template #body="{ data }">
-                  <div class="text-right shrink-0">
-                    <div
-                      class="text-base font-black tabular-nums text-[var(--text-main)] whitespace-nowrap"
-                    >
-                      {{ formatCurrency(data.current, data.currency) }}
-                    </div>
-                    <div
-                      v-if="data.delta !== 0"
-                      class="text-xs font-bold tabular-nums mt-0.5"
-                      :class="
-                        data.delta > 0 ? 'text-green-600' : 'text-red-500'
-                      "
-                    >
-                      {{ data.delta > 0 ? "+" : ""
-                      }}{{ formatCurrency(data.delta, data.currency) }}
-                    </div>
-                  </div>
-                </template>
-              </Column>
-              <template #empty>
-                <div class="p-8 text-center text-sub">目前沒有記錄</div>
-              </template>
-            </DataTable>
-          </template>
-        </Card>
+              近半年
+            </button>
+          </div>
+        </div>
+        <div class="flex-1 w-full min-h-0 relative">
+          <Skeleton v-if="isLoading" width="100%" height="100%" />
+          <Chart
+            v-else
+            type="line"
+            :data="trendData"
+            :options="trendOptions"
+            @select="onTrendSelect"
+            class="absolute inset-0 w-full h-full"
+          />
+        </div>
       </div>
 
-      <!-- 右側資訊欄 (手機版排在第 1) - Sticky -->
-      <div class="lg:col-span-4 sticky top-6 order-1 lg:order-2">
-        <!-- 資產佈局圓餅 -->
-        <Card class="shadow-sm border border-[var(--line-soft)]">
-          <template #title>
-            <div class="flex items-center justify-between mb-8">
-              <span class="text-lg font-bold text-[var(--text-main)]"
-                >資產佈局</span
-              >
-              <Tag
-                :value="selectedMonth"
-                severity="info"
-                class="text-[10px] uppercase font-bold tracking-widest"
-              />
-            </div>
-          </template>
-          <template #content>
-            <Skeleton v-if="isLoading" height="240px" borderRadius="14px" />
+      <!-- Donut Chart -->
+      <div class="xl:col-span-1 apollo-card flex flex-col min-h-[400px]">
+        <div class="flex items-center justify-between mb-6">
+          <span class="text-[17px] font-bold text-[var(--text-main)]"
+            >資產落點</span
+          >
+          <Tag
+            :value="selectedMonth"
+            severity="secondary"
+            class="shadow-none bg-[var(--app-bg)] text-[var(--text-sub)] font-bold text-[10px]"
+          />
+        </div>
+
+        <div class="flex-1 flex flex-col justify-center relative min-h-0">
+          <Skeleton v-if="isLoading" width="100%" height="200px" />
+          <div
+            v-else-if="!assetAllocationList.length"
+            class="text-center text-[var(--text-sub)] text-sm"
+          >
+            暫無資料
+          </div>
+          <template v-else>
             <div
-              v-else-if="!assetAllocationList.length"
-              class="py-12 text-center text-sm text-[var(--text-sub)]"
+              class="relative w-full max-h-[220px] mx-auto mb-6 shrink-0 aspect-square flex items-center justify-center"
             >
-              本月無資產資料
+              <Chart
+                type="doughnut"
+                :data="donutData"
+                :options="donutOptions"
+                class="w-full h-full"
+              />
+              <div
+                class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center"
+              >
+                <template v-if="hoveredAssetIdx !== null">
+                  <span
+                    class="text-[14px] uppercase tracking-widest text-[var(--text-sub)] font-bold mb-1 truncate w-[100px]"
+                    >{{
+                      assetAllocationList[hoveredAssetIdx].accountName
+                    }}</span
+                  >
+                  <span
+                    class="text-[18px] font-black text-[var(--primary)] tabular-nums leading-none"
+                    >{{ assetAllocationList[hoveredAssetIdx].pct }}%</span
+                  >
+                </template>
+                <template v-else>
+                  <span
+                    class="text-[14px] uppercase tracking-widest text-[var(--text-sub)] font-bold mb-1"
+                    >總資產</span
+                  >
+                  <span
+                    class="text-[18px] font-black text-[var(--text-main)] tabular-nums leading-none mb-1"
+                    >100%</span
+                  >
+                </template>
+              </div>
             </div>
 
-            <div v-else class="flex flex-col items-center">
-              <!-- 圓餅圖容器 (使用 aspect-ratio 確保正圓且不被切割) -->
-              <div
-                class="relative w-full max-w-[280px] aspect-square flex items-center justify-center mb-8 shrink-0"
-              >
-                <Chart
-                  type="doughnut"
-                  :data="donutData"
-                  :options="donutOptions"
-                  class="w-full h-full"
-                />
-
-                <!-- 中央文字 (整合金額與百分比) -->
+            <div
+              class="flex-1 overflow-y-auto w-full px-2"
+              style="scrollbar-width: none"
+            >
+              <div class="flex flex-col gap-2">
                 <div
-                  class="absolute flex flex-col items-center justify-center pointer-events-none text-center w-32"
+                  v-for="(item, idx) in assetAllocationList"
+                  :key="item.id"
+                  class="flex items-center justify-between py-1.5 cursor-default hover:bg-[var(--app-bg)] rounded-lg px-2 transition-colors"
+                  @mouseenter="hoveredAssetIdx = idx"
+                  @mouseleave="hoveredAssetIdx = null"
                 >
-                  <template v-if="hoveredAssetIdx !== null">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div
+                      class="w-2.5 h-2.5 rounded-full shadow-sm shrink-0"
+                      :style="{
+                        background:
+                          ALLOCATION_PALETTE[idx % ALLOCATION_PALETTE.length],
+                      }"
+                    ></div>
                     <span
-                      class="text-[15px] uppercase tracking-widest text-[var(--text-sub)] font-bold mb-1 truncate w-full"
+                      class="text-[13px] font-bold text-[var(--text-main)] truncate max-w-[120px]"
+                      >{{ item.accountName }}</span
                     >
-                      {{ assetAllocationList[hoveredAssetIdx].accountName }}
-                    </span>
+                  </div>
+                  <div class="flex flex-col items-end whitespace-nowrap">
                     <span
-                      class="text-[15px] font-black text-[var(--primary)] tabular-nums leading-none mb-1"
-                    >
-                      {{ assetAllocationList[hoveredAssetIdx].pct }}%
-                    </span>
-                    <span
-                      class="text-[15px] font-bold text-[var(--text-main)] opacity-70"
-                    >
-                      {{
-                        formatCurrency(
-                          assetAllocationList[hoveredAssetIdx].netImpactTwd,
-                          assetAllocationList[hoveredAssetIdx].currency,
-                        )
-                      }}
-                    </span>
-                  </template>
-                  <template v-else>
-                    <span
-                      class="text-[15px] uppercase tracking-widest text-[var(--text-sub)] font-bold mb-1"
-                      >總資產</span
+                      class="text-[14px] font-black tabular-nums text-[var(--text-main)] leading-tight"
+                      >{{ formatTwd(item.netImpactTwd) }}</span
                     >
                     <span
-                      class="text-[15px] font-black text-[var(--text-main)] tabular-nums leading-none mb-1"
-                      >100%</span
+                      class="text-[11px] font-bold tabular-nums text-[var(--text-sub)]"
+                      >{{ item.pct }}%</span
                     >
-                    <span class="text-[15px] font-bold text-[var(--positive)]">
-                      {{ formatTwd(totalAsset) }}
-                    </span>
-                  </template>
-                </div>
-              </div>
-
-              <!-- 垂直圖例清單 -->
-              <div class="w-full">
-                <div class="flex flex-col gap-1">
-                  <div
-                    v-for="(item, idx) in assetAllocationList"
-                    :key="item.id"
-                    class="flex items-center justify-between group cursor-default p-2 rounded-xl hover:bg-[var(--app-bg)] transition-all"
-                    @mouseenter="hoveredAssetIdx = idx"
-                    @mouseleave="hoveredAssetIdx = null"
-                  >
-                    <div class="flex items-center gap-3 min-w-0">
-                      <div
-                        class="w-3 h-3 rounded-full shrink-0 shadow-sm"
-                        :style="{
-                          background:
-                            ALLOCATION_PALETTE[idx % ALLOCATION_PALETTE.length],
-                        }"
-                      />
-                      <span
-                        class="text-[15px] font-bold text-[var(--text-main)] truncate group-hover:text-[var(--primary)] transition-colors"
-                      >
-                        {{ item.accountName }}
-                      </span>
-                    </div>
-
-                    <div class="flex items-center gap-4 shrink-0 text-right">
-                      <span
-                        class="text-sm font-semibold text-[var(--text-sub)] tabular-nums"
-                      >
-                        {{ formatCurrency(item.netImpactTwd, item.currency) }}
-                      </span>
-                      <span
-                        class="text-sm font-black text-[var(--text-main)] tabular-nums w-[45px] text-right"
-                      >
-                        {{ item.pct }}%
-                      </span>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </template>
-        </Card>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Table Area -->
+    <div class="apollo-card p-0 overflow-hidden mt-6 mb-8">
+      <div
+        class="p-6 border-b border-[var(--line-soft)] flex items-center justify-between"
+      >
+        <span class="text-[17px] font-bold text-[var(--text-main)]"
+          >本月綜合明細</span
+        >
+        <button
+          class="w-8 h-8 rounded-full hover:bg-[var(--app-bg)] flex items-center justify-center text-[var(--text-sub)] transition-colors"
+        >
+          <i class="pi pi-ellipsis-v text-sm"></i>
+        </button>
+      </div>
+      <div class="p-0">
+        <DataTable
+          :value="detailedSnapshotRows"
+          class="w-full text-sm"
+          dataKey="key"
+          :loading="isLoading"
+          tableStyle="width: 100%; table-layout: fixed;"
+          :pt="{
+            root: { class: 'border-none' },
+            wrapper: { class: 'border-none w-full overflow-hidden' },
+          }"
+        >
+          <Column
+            header="帳戶"
+            class="py-4 px-3 sm:px-6 border-b border-[var(--line-soft)] w-[40%] sm:w-1/2"
+          >
+            <template #body="{ data }">
+              <div class="flex items-center gap-2 sm:gap-3 overflow-hidden">
+                <Tag
+                  :value="data.type === 'asset' ? '資' : '債'"
+                  :severity="data.type === 'asset' ? 'success' : 'warn'"
+                  class="text-[10px] py-1 px-1.5 sm:px-2 rounded font-bold shadow-none shrink-0"
+                />
+                <span
+                  class="text-[14px] sm:text-[15px] font-bold text-[var(--text-main)] truncate"
+                  >{{ data.accountName }}</span
+                >
+              </div>
+            </template>
+          </Column>
+          <!-- 順序調整：先顯示餘額 -->
+          <Column
+            header="餘額"
+            class="py-4 px-3 sm:px-6 border-b border-[var(--line-soft)] text-right w-[35%] sm:w-[25%]"
+          >
+            <template #body="{ data }">
+              <div
+                class="text-[14px] sm:text-[15px] font-black tabular-nums text-[var(--text-main)] truncate"
+              >
+                {{ formatCurrency(data.current, data.currency) }}
+              </div>
+            </template>
+          </Column>
+          <!-- 接著顯示異動 -->
+          <Column
+            header="異動"
+            class="py-4 px-3 sm:px-6 border-b border-[var(--line-soft)] text-right w-[25%]"
+          >
+            <template #body="{ data }">
+              <div
+                class="text-[13px] sm:text-[14px] font-bold tabular-nums truncate"
+                :class="
+                  data.delta > 0
+                    ? 'text-[var(--positive)]'
+                    : data.delta < 0
+                      ? 'text-[var(--negative)]'
+                      : 'text-[var(--text-sub)]'
+                "
+              >
+                {{ data.delta > 0 ? "+" : ""
+                }}{{ formatCurrency(data.delta, data.currency) }}
+              </div>
+            </template>
+          </Column>
+          <template #empty>
+            <div
+              class="py-12 text-center text-[14px] font-semibold text-[var(--text-sub)]"
+            >
+              暫無資料
+            </div>
+          </template>
+        </DataTable>
       </div>
     </div>
   </div>

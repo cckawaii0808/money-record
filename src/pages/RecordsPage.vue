@@ -143,67 +143,103 @@ const fmtTwd = (v: number) =>
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto px-4 pt-6 pb-24">
-    <!-- 月份導覽 -->
-    <div class="flex items-center justify-center gap-2 mb-4">
-      <Button
-        icon="pi pi-chevron-left"
-        rounded
-        text
-        :disabled="isFirst"
-        @click="goToPrevMonth"
-        aria-label="上個月"
-      />
-      <span
-        class="text-xl font-extrabold text-[var(--text-main)] min-w-28 text-center whitespace-nowrap"
+  <div class="max-w-5xl mx-auto px-4 pt-4 sm:pt-6 pb-24 relative">
+    <!-- 月份選擇器 (獨立置中) -->
+    <div
+      class="flex justify-center mb-6 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:static sm:mx-0 sm:px-0 sm:py-0 sm:bg-transparent"
+    >
+      <div
+        class="inline-flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-2xl shadow-sm border border-[var(--line-soft)]"
       >
-        {{ selectedMonth }}
-      </span>
-      <Button
-        icon="pi pi-chevron-right"
-        rounded
-        text
-        :disabled="isLast"
-        @click="goToNextMonth"
-        aria-label="下個月"
-      />
+        <Button
+          icon="pi pi-chevron-left"
+          text
+          rounded
+          @click="goToPrevMonth"
+          :disabled="isFirst"
+          class="text-[var(--text-sub)] !p-2 h-10 w-10"
+        />
+        <span
+          class="w-36 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums"
+          >{{ selectedMonth }}</span
+        >
+        <Button
+          icon="pi pi-chevron-right"
+          text
+          rounded
+          @click="goToNextMonth"
+          :disabled="isLast"
+          class="text-[var(--text-sub)] !p-2 h-10 w-10"
+        />
+      </div>
     </div>
 
-    <!-- 月份摘要 -->
-    <div
-      class="flex items-stretch rounded-2xl border border-[var(--line-soft)] bg-[var(--surface)] shadow-sm mb-8 overflow-hidden max-w-2xl mx-auto"
-    >
-      <div class="flex-1 flex flex-col items-center py-3 gap-0.5">
-        <span
-          class="text-[10px] font-semibold text-[var(--text-sub)] uppercase tracking-wide"
-          >資產</span
-        >
-        <span class="text-sm font-extrabold tabular-nums text-green-600">{{
-          fmtTwd(totalAssetTwd)
-        }}</span>
+    <!-- Apollo KPI 摘要區 (分離的三張卡片) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <!-- Asset KPI -->
+      <div class="apollo-card flex flex-col justify-between h-[130px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[13px] font-bold text-[var(--text-main)]"
+              >總資產</span
+            >
+            <span
+              class="text-[26px] font-black tabular-nums tracking-tight text-[var(--positive)]"
+              >{{ fmtTwd(totalAssetTwd) }}</span
+            >
+          </div>
+          <div
+            class="w-10 h-10 rounded-xl bg-[var(--primary-soft)] flex items-center justify-center text-[var(--primary)]"
+          >
+            <i class="pi pi-building text-lg"></i>
+          </div>
+        </div>
       </div>
-      <div class="w-px bg-[var(--line-soft)]" />
-      <div class="flex-1 flex flex-col items-center py-3 gap-0.5">
-        <span
-          class="text-[10px] font-semibold text-[var(--text-sub)] uppercase tracking-wide"
-          >負債</span
-        >
-        <span class="text-sm font-extrabold tabular-nums text-red-500">{{
-          fmtTwd(totalLiabTwd)
-        }}</span>
+
+      <!-- Liability KPI -->
+      <div class="apollo-card flex flex-col justify-between h-[130px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[13px] font-bold text-[var(--text-main)]"
+              >總負債</span
+            >
+            <span
+              class="text-[26px] font-black tabular-nums tracking-tight text-[var(--negative)]"
+              >{{ fmtTwd(totalLiabTwd) }}</span
+            >
+          </div>
+          <div
+            class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500"
+          >
+            <i class="pi pi-credit-card text-lg"></i>
+          </div>
+        </div>
       </div>
-      <div class="w-px bg-[var(--line-soft)]" />
-      <div class="flex-1 flex flex-col items-center py-3 gap-0.5">
-        <span
-          class="text-[10px] font-semibold text-[var(--text-sub)] uppercase tracking-wide"
-          >淨值</span
-        >
-        <span
-          class="text-sm font-extrabold tabular-nums"
-          :class="netWorthTwd >= 0 ? 'text-green-600' : 'text-red-500'"
-        >
-          {{ fmtTwd(netWorthTwd) }}
-        </span>
+
+      <!-- Net Worth KPI -->
+      <div class="apollo-card flex flex-col justify-between h-[130px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[13px] font-bold text-[var(--text-main)]"
+              >本月淨值</span
+            >
+            <span
+              class="text-[26px] font-black tabular-nums tracking-tight"
+              :class="
+                netWorthTwd >= 0
+                  ? 'text-[var(--positive)]'
+                  : 'text-[var(--negative)]'
+              "
+            >
+              {{ fmtTwd(netWorthTwd) }}
+            </span>
+          </div>
+          <div
+            class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500"
+          >
+            <i class="pi pi-wallet text-lg"></i>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -231,35 +267,42 @@ const fmtTwd = (v: number) =>
             <h3 class="text-xs font-bold text-[var(--text-sub)] mb-2 px-1">
               {{ catName }}
             </h3>
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-3">
               <div
                 v-for="acc in accounts"
                 :key="acc.id"
-                class="flex items-center gap-3 bg-[var(--surface)] border border-[var(--line-soft)] rounded-xl px-3.5 py-3 cursor-pointer transition-all hover:border-primary hover:shadow-md active:scale-[0.99]"
+                class="apollo-card !p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:-translate-y-[1px] hover:border-[var(--primary)] transition-all"
                 @click="openEdit(acc)"
                 role="button"
                 tabindex="0"
                 @keydown.enter="openEdit(acc)"
               >
-                <div
-                  class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-base font-extrabold shrink-0"
-                  :style="{ background: acc.color ?? '#0f766e' }"
-                >
-                  {{ acc.name.charAt(0) }}
-                </div>
-                <div class="flex-1 min-w-0">
+                <!-- 卡片左側 (名字與圖示) -->
+                <div class="flex items-center gap-3 min-w-0">
                   <div
-                    class="text-sm font-bold text-[var(--text-main)] truncate"
+                    class="w-10 h-10 rounded-[12px] flex items-center justify-center text-white text-[16px] font-black shrink-0 shadow-sm"
+                    :style="{ background: acc.color ?? '#0f766e' }"
                   >
-                    {{ accountDisplayName(acc) }}
+                    {{ acc.name.charAt(0) }}
                   </div>
-                  <div class="text-[11px] text-[var(--text-sub)] mt-0.5">
-                    {{ acc.currency }}
+                  <div class="flex flex-col min-w-0">
+                    <span
+                      class="text-[14px] sm:text-[15px] font-bold text-[var(--text-main)] truncate"
+                    >
+                      {{ accountDisplayName(acc) }}
+                    </span>
+                    <span
+                      class="text-[11px] sm:text-[13px] text-[var(--text-sub)] font-semibold mt-0.5"
+                    >
+                      {{ acc.currency }}
+                    </span>
                   </div>
                 </div>
-                <div class="text-right shrink-0">
+
+                <!-- 卡片右側 (金額與漲跌) -->
+                <div class="flex items-center justify-end gap-3 shrink-0 ml-2">
                   <div
-                    class="text-sm font-bold tabular-nums text-[var(--text-main)]"
+                    class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--text-main)] text-right"
                   >
                     {{
                       formatCurrency(
@@ -268,15 +311,24 @@ const fmtTwd = (v: number) =>
                       )
                     }}
                   </div>
-                  <div
-                    v-if="deltaFor(acc) !== 0"
-                    class="text-[11px] font-semibold tabular-nums mt-0.5"
-                    :class="
-                      deltaFor(acc) > 0 ? 'text-green-600' : 'text-red-500'
-                    "
-                  >
-                    {{ deltaFor(acc) > 0 ? "+" : ""
-                    }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
+                  <div class="flex items-center justify-end w-16 sm:w-24">
+                    <span
+                      v-if="deltaFor(acc) !== 0"
+                      class="text-[12px] sm:text-[13px] font-bold tabular-nums"
+                      :class="
+                        deltaFor(acc) > 0
+                          ? 'text-[var(--positive)]'
+                          : 'text-[var(--negative)]'
+                      "
+                    >
+                      {{ deltaFor(acc) > 0 ? "+" : ""
+                      }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
+                    </span>
+                    <span
+                      v-else
+                      class="text-[12px] sm:text-[13px] font-bold text-[var(--text-muted)]"
+                      >-</span
+                    >
                   </div>
                 </div>
               </div>
@@ -298,34 +350,43 @@ const fmtTwd = (v: number) =>
             <h3 class="text-xs font-bold text-[var(--text-sub)] mb-2 px-1">
               {{ catName }}
             </h3>
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-3">
               <div
                 v-for="acc in accounts"
                 :key="acc.id"
-                class="flex items-center gap-3 bg-[var(--surface)] border border-[var(--line-soft)] rounded-xl px-3.5 py-3 cursor-pointer transition-all hover:border-red-400 hover:shadow-md active:scale-[0.99]"
+                class="apollo-card !p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:-translate-y-[1px] hover:border-[var(--negative)] transition-all"
                 @click="openEdit(acc)"
                 role="button"
                 tabindex="0"
                 @keydown.enter="openEdit(acc)"
               >
-                <div
-                  class="w-10 h-10 rounded-xl flex items-center justify-center text-white text-base font-extrabold shrink-0"
-                  :style="{ background: acc.color ?? '#dc2626' }"
-                >
-                  {{ acc.name.charAt(0) }}
-                </div>
-                <div class="flex-1 min-w-0">
+                <!-- 卡片左側 -->
+                <div class="flex items-center gap-3 min-w-0">
                   <div
-                    class="text-sm font-bold text-[var(--text-main)] truncate"
+                    class="w-10 h-10 rounded-[12px] flex items-center justify-center text-white text-[16px] font-black shrink-0 shadow-sm"
+                    :style="{ background: acc.color ?? '#dc2626' }"
                   >
-                    {{ accountDisplayName(acc) }}
+                    {{ acc.name.charAt(0) }}
                   </div>
-                  <div class="text-[11px] text-[var(--text-sub)] mt-0.5">
-                    {{ acc.currency }}
+                  <div class="flex flex-col min-w-0">
+                    <span
+                      class="text-[14px] sm:text-[15px] font-bold text-[var(--text-main)] truncate"
+                    >
+                      {{ accountDisplayName(acc) }}
+                    </span>
+                    <span
+                      class="text-[11px] sm:text-[13px] text-[var(--text-sub)] font-semibold mt-0.5"
+                    >
+                      {{ acc.currency }}
+                    </span>
                   </div>
                 </div>
-                <div class="text-right shrink-0">
-                  <div class="text-sm font-bold tabular-nums text-red-500">
+
+                <!-- 卡片右側 -->
+                <div class="flex items-center justify-end gap-3 shrink-0 ml-2">
+                  <div
+                    class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--negative)] text-right"
+                  >
                     {{
                       formatCurrency(
                         amountAtMonth(acc.id, selectedMonth),
@@ -333,15 +394,24 @@ const fmtTwd = (v: number) =>
                       )
                     }}
                   </div>
-                  <div
-                    v-if="deltaFor(acc) !== 0"
-                    class="text-[11px] font-semibold tabular-nums mt-0.5"
-                    :class="
-                      deltaFor(acc) > 0 ? 'text-red-500' : 'text-green-600'
-                    "
-                  >
-                    {{ deltaFor(acc) > 0 ? "+" : ""
-                    }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
+                  <div class="flex items-center justify-end w-16 sm:w-24">
+                    <span
+                      v-if="deltaFor(acc) !== 0"
+                      class="text-[12px] sm:text-[13px] font-bold tabular-nums"
+                      :class="
+                        deltaFor(acc) > 0
+                          ? 'text-[var(--negative)]'
+                          : 'text-[var(--positive)]'
+                      "
+                    >
+                      {{ deltaFor(acc) > 0 ? "+" : ""
+                      }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
+                    </span>
+                    <span
+                      v-else
+                      class="text-[12px] sm:text-[13px] font-bold text-[var(--text-muted)]"
+                      >-</span
+                    >
                   </div>
                 </div>
               </div>

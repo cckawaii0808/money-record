@@ -1,73 +1,74 @@
 /**
- * variables.css — 現代淺色 Fintech 色盤
- * 設計方向：Notion・Stripe・Linear 美學
- * 字型：DM Sans（現代無襯線）/ DM Mono（數字等寬）
- * 主色：靛藍紫（Indigo）— 沉穩信賴感、有別於俗氣的藍
+ * variables.css — Apollo Theme Exact Match
+ * 設計方向：PrimeVue Apollo 模板像素級還原
+ * 字型：DM Sans（現代無襯線）
  */
 
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=DM+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap");
 
 :root,
 :root[data-theme="light"] {
-  /* --- 背景層次 --- */
-  --app-bg:      #f1f5f9;      /* slate-100：整頁底色 */
+  /* --- 核心背景與表面 (Apollo: 冷灰底色, 純白表面) --- */
+  --app-bg:      #f4f6f9;      /* 極度還原的冷灰色背景 */
   --surface:     #ffffff;      /* 卡片純白 */
-  --surface-elev: rgba(255,255,255,0.95);
+  --surface-elev: rgba(255,255,255,0.98);
 
-  /* --- 文字 --- */
-  --text-main:  #0f172a;       /* slate-900 */
-  --text-sub:   #64748b;       /* slate-500 */
-  --text-muted: #94a3b8;       /* slate-400 */
+  /* --- 文字字體與顏色 --- */
+  --text-main:  #1e293b;       /* 深沉的標題色 */
+  --text-sub:   #64748b;       /* 次要文字、標籤色 */
+  --text-muted: #94a3b8;       /* 提示性弱文字 */
+  
+  /* --- 線條 --- */
+  --line-soft:   #e2e8f0;      /* 卡片外框或分割線 (很淡的灰) */
+  --line-strong: #cbd5e1;
 
-  /* --- 邊線 --- */
-  --line-soft:   #e2e8f0;      /* slate-200 */
-  --line-strong: #cbd5e1;      /* slate-300 */
+  /* --- 主題色 (Apollo 的品牌綠與按鈕色) --- */
+  --primary:       #10b981;    /* Emerald-500: Apollo 預設偏好的活潑綠 */
+  --primary-hover: #059669;    /* Emerald-600 */
+  --primary-soft:  #ecfdf5;    /* Emerald-50 */
+  --primary-ring:  rgba(16, 185, 129, 0.15);
 
-  /* --- 主色：靛藍紫 --- */
-  --primary:       #4f46e5;    /* indigo-600 */
-  --primary-hover: #4338ca;    /* indigo-700 */
-  --primary-soft:  #eef2ff;    /* indigo-50 */
-  --primary-ring:  rgba(79,70,229,0.2);
+  /* --- 語意色 (Apollo 風格的漲跌色) --- */
+  --positive: #10b981;         /* Emerald-500 */
+  --negative: #f43f5e;         /* Rose-500 */
+  --warn:     #f59e0b;         /* Amber-500 */
 
-  /* --- 語意色 --- */
-  --positive: #059669;         /* emerald-600 */
-  --negative: #e11d48;         /* rose-600 */
-  --warn:     #d97706;         /* amber-600 */
-
-  /* --- 側邊欄 --- */
+  /* --- 側邊欄專屬色 --- */
   --sidebar-bg:          #ffffff;
-  --sidebar-text:        #0f172a;
-  --sidebar-text-muted:  #64748b;
-  --sidebar-active-bg:   #eef2ff;
-  --sidebar-active-text: #4f46e5;
+  --sidebar-text:        #475569;
+  --sidebar-text-muted:  #94a3b8;
+  --sidebar-active-bg:   transparent;
+  --sidebar-active-text: var(--primary);
 
-  /* --- 其他 --- */
-  --topbar-bg:   rgba(241,245,249,0.9);
-  --card-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 12px rgba(15,23,42,0.04);
+  /* --- 卡片專屬陰影設定 --- 
+     Apollo 卡片陰影極輕，稍微帶點垂直位移，散發著「乾淨」感
+  */
+  --card-shadow: 0 4px 10px rgba(0,0,0,0.03), 0 0 2px rgba(0,0,0,0.06);
+  --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.03);
 }
 
-/* 深色模式保留但簡化 */
+/* 深色模式暫時保留相對值，此階段重心在對齊淺色 Apollo 版 */
 :root[data-theme="dark"] {
   --app-bg:     #0f172a;
   --surface:    #1e293b;
-  --surface-elev: rgba(30,41,59,0.92);
+  --surface-elev: rgba(30,41,59,0.95);
   --text-main:  #f8fafc;
   --text-sub:   #94a3b8;
   --text-muted: #64748b;
-  --line-soft:   rgba(248,250,252,0.07);
-  --line-strong: rgba(248,250,252,0.15);
-  --primary:       #818cf8;    /* indigo-400 */
-  --primary-hover: #a5b4fc;
-  --primary-soft:  rgba(129,140,248,0.12);
-  --primary-ring:  rgba(129,140,248,0.3);
+  --line-soft:   rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.15);
+  --primary:       #34d399;
+  --primary-hover: #10b981;
+  --primary-soft:  rgba(52, 211, 153, 0.1);
+  --primary-ring:  rgba(52, 211, 153, 0.2);
   --positive: #34d399;
   --negative: #fb7185;
   --warn:     #fbbf24;
-  --sidebar-bg:          #0f172a;
-  --sidebar-text:        #f8fafc;
-  --sidebar-text-muted:  #64748b;
-  --sidebar-active-bg:   rgba(129,140,248,0.12);
-  --sidebar-active-text: #818cf8;
-  --topbar-bg:   rgba(15,23,42,0.9);
-  --card-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 6px 20px rgba(0,0,0,0.3);
+  --sidebar-bg:          #1e293b;
+  --sidebar-text:        #e2e8f0;
+  --sidebar-text-muted:  #94a3b8;
+  --sidebar-active-bg:   transparent;
+  --sidebar-active-text: var(--primary);
+  --card-shadow: 0 8px 30px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.2);
+  --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.4);
 }
