@@ -4,7 +4,7 @@ import { defineStore } from "pinia";
 interface SelectOption { label: string; value: string | number; }
 
 import { EARLIEST_SELECTABLE_MONTH } from "../constants";
-import type { Account, AccountType, Currency, MonthlyRecord } from "../types";
+import type { Account, AccountType, Currency, Holding, MonthlyRecord } from "../types";
 import { formatCurrency, formatPct } from "../utils/formatters";
 import {
   getCurrentMonth,
@@ -15,7 +15,7 @@ import {
 } from "../utils/monthUtils";
 import { resolveBankIcon } from "../features/asset-manager/utils/bankIcons";
 import { supabase, isMockMode } from "../supabase";
-import { seedAccounts, seedRecords } from "../data";
+import { seedAccounts, seedRecords, seedInvestments } from "../data";
 import axios from "axios";
 
 // --- 介面定義 (Interfaces) ---
@@ -87,6 +87,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   // --- 狀態管理 (State) ---
   const accounts = ref<Account[]>([]);
   const records = ref<MonthlyRecord[]>([]);
+  const holdings = ref<Holding[]>([]);
   const isLoading = ref(false); // 資料載入中狀態
 
   // 匯率相關狀態
@@ -334,11 +335,145 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
   }
 
+  /** 從 Supabase 讀取投資部位 */
+  async function fetchHoldings() {
+    if (isMockMode) {
+      holdings.value = seedInvestments.map(h => ({ ...h }));
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("holdings")
+      .select("*")
+      .order("sort_order");
+
+    if (!error && data) {
+      holdings.value = (data as any[]).map(row => ({
+        id: row.id,
+        symbol: row.symbol,
+        market: row.market,
+        name: row.name,
+        shares: row.shares,
+        loaned_shares: row.loaned_shares,
+        cost_basis: row.cost_basis,
+        current_price: row.current_price,
+        currency: row.currency,
+      }));
+    }
+  }
+
+  /** 新增投資部位 */
+  async function addHolding(payload: Omit<Holding, "id">): Promise<ActionResult> {
+    if (isMockMode) {
+      holdings.value.push({ ...payload, id: "inv-" + Date.now() });
+      return { type: "success", message: "已新增部位。" };
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { type: "error", message: "請先登入。" };
+
+    const { data, error } = await supabase
+      .from("holdings")
+      .insert({
+        user_id: user.id,
+        symbol: payload.symbol,
+        market: payload.market,
+        name: payload.name,
+        shares: payload.shares ?? 0,
+        loaned_shares: payload.loaned_shares ?? 0,
+        cost_basis: payload.cost_basis ?? 0,
+        current_price: payload.current_price,
+        currency: payload.currency,
+      })
+      .select()
+      .single();
+
+    if (error || !data) return { type: "error", message: `新增失敗: ${error?.message}` };
+
+    const row = data as any;
+    holdings.value.push({
+      id: row.id,
+      symbol: row.symbol,
+      market: row.market,
+      name: row.name,
+      shares: row.shares,
+      loaned_shares: row.loaned_shares,
+      cost_basis: row.cost_basis,
+      current_price: row.current_price,
+      currency: row.currency,
+    });
+    return { type: "success", message: "已新增部位。" };
+  }
+
+  /** 更新投資部位 */
+  async function updateHolding(id: string, updates: Partial<Omit<Holding, "id">>): Promise<ActionResult> {
+    if (isMockMode) {
+      const idx = holdings.value.findIndex(h => h.id === id);
+      if (idx !== -1) holdings.value[idx] = { ...holdings.value[idx], ...updates };
+      return { type: "success", message: "已更新部位。" };
+    }
+
+    const { error } = await supabase
+      .from("holdings")
+      .update(updates)
+      .eq("id", id);
+
+    if (error) return { type: "error", message: `更新失敗: ${error.message}` };
+
+    const idx = holdings.value.findIndex(h => h.id === id);
+    if (idx !== -1) holdings.value[idx] = { ...holdings.value[idx], ...updates };
+    return { type: "success", message: "已更新部位。" };
+  }
+
+  /** 刪除投資部位 */
+  async function deleteHolding(id: string): Promise<ActionResult> {
+    if (isMockMode) {
+      holdings.value = holdings.value.filter(h => h.id !== id);
+      return { type: "success", message: "已刪除部位。" };
+    }
+
+    const { error } = await supabase
+      .from("holdings")
+      .delete()
+      .eq("id", id);
+
+    if (error) return { type: "error", message: `刪除失敗: ${error.message}` };
+
+    holdings.value = holdings.value.filter(h => h.id !== id);
+    return { type: "success", message: "已刪除部位。" };
+  }
+
+  /** 批次更新報價快取（更新本地狀態，並非同步寫回 DB） */
+  function batchCacheHoldingPrices(prices: Record<string, number>) {
+    holdings.value.forEach(h => {
+      if (prices[h.symbol] !== undefined) {
+        h.current_price = prices[h.symbol];
+      }
+    });
+
+    // 非同步寫回 DB（fire-and-forget，不阻塞 UI）
+    if (!isMockMode) {
+      void Promise.all(
+        holdings.value
+          .filter(h => prices[h.symbol] !== undefined)
+          .map(h =>
+            supabase
+              .from("holdings")
+              .update({ current_price: prices[h.symbol] })
+              .eq("id", h.id)
+          )
+      );
+    }
+  }
+
   /** 初始化資料 (應用程式啟動時呼叫) */
   async function initData() {
     if (dataInitialized) return;
     isLoading.value = true;
-    await Promise.all([fetchAccounts(), fetchRecords(), refreshFxRates()]);
+    await Promise.all([fetchAccounts(), fetchRecords(), fetchHoldings(), refreshFxRates()]);
     isLoading.value = false;
     dataInitialized = true;
   }
@@ -836,6 +971,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   return {
     accounts,
     records,
+    holdings,
     isLoading,
     fxRates,
     fxLoading,
@@ -885,6 +1021,11 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     updateAccount,
     reorderAccount,
     deleteAccount,
+    fetchHoldings,
+    addHolding,
+    updateHolding,
+    deleteHolding,
+    batchCacheHoldingPrices,
     initData
   };
 });

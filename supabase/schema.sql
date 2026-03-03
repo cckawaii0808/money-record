@@ -132,3 +132,74 @@ create trigger on_monthly_records_updated
 create index idx_accounts_user_id on public.accounts(user_id);
 create index idx_monthly_records_user_id on public.monthly_records(user_id);
 create index idx_monthly_records_month on public.monthly_records(month);
+
+-- ============================================================
+-- 5. stocks 資料表（台股 / 美股清單，公開參考資料）
+-- ============================================================
+create table public.stocks (
+  symbol  text primary key,           -- Yahoo Finance 格式代號，如 2330.TW / AAPL
+  code    text not null,              -- 純代號，如 2330
+  name    text not null,              -- 顯示名稱，如 台積電
+  market  text not null,              -- TW | US
+  exch    text not null default '',   -- TAI（上市）/ OTC（上櫃）/ NYSE / NASDAQ 等
+  updated_at timestamptz default now()
+);
+
+-- 所有登入使用者可讀；僅 service_role（後端腳本）可寫
+alter table public.stocks enable row level security;
+
+create policy "Stocks are viewable by authenticated users"
+  on public.stocks for select
+  to authenticated
+  using (true);
+
+-- 索引：市場分類查詢
+create index idx_stocks_market on public.stocks(market);
+create index idx_stocks_code   on public.stocks(code);
+
+-- ============================================================
+-- 6. holdings 資料表（使用者投資組合部位）
+-- ============================================================
+create table public.holdings (
+  id            uuid primary key default uuid_generate_v4(),
+  user_id       uuid references auth.users(id) on delete cascade not null,
+  symbol        text not null,              -- Yahoo Finance 格式代號
+  market        text not null,              -- TW | US
+  name          text not null default '',   -- 顯示名稱（可為空，前端自行補全）
+  shares        numeric not null default 0, -- 持有股數（支援小數，如美股 0.5 股）
+  loaned_shares numeric not null default 0, -- 已借出股數
+  cost_basis    numeric not null default 0, -- 購入平均成本（每股）
+  current_price numeric,                    -- 最後快取的市價（null = 尚未查詢）
+  currency      text not null check (currency in ('TWD', 'USD', 'JPY')),
+  sort_order    integer default 0,
+  created_at    timestamptz default now(),
+  updated_at    timestamptz default now()
+);
+
+-- 啟用 RLS
+alter table public.holdings enable row level security;
+
+create policy "Users can view their own holdings"
+  on public.holdings for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own holdings"
+  on public.holdings for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own holdings"
+  on public.holdings for update
+  using (auth.uid() = user_id);
+
+create policy "Users can delete their own holdings"
+  on public.holdings for delete
+  using (auth.uid() = user_id);
+
+-- updated_at 觸發器
+create trigger on_holdings_updated
+  before update on public.holdings
+  for each row execute procedure public.handle_updated_at();
+
+-- 索引
+create index idx_holdings_user_id on public.holdings(user_id);
+create index idx_holdings_symbol  on public.holdings(symbol);

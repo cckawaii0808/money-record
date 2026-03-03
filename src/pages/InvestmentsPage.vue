@@ -5,12 +5,14 @@ const { isDesktop } = useIsDesktop();
 import Button from "primevue/button";
 import Dialog from "primevue/dialog";
 import InputNumber from "primevue/inputnumber";
-import InputText from "primevue/inputtext";
 import ToggleSwitch from "primevue/toggleswitch";
-import Checkbox from "primevue/checkbox";
 import AutoComplete from "primevue/autocomplete";
 import Tag from "primevue/tag";
-import { seedInvestments } from "../data";
+import type { Holding } from "../types";
+import { useAssetManagerStore } from "../stores/assetManager";
+
+// AutoComplete 選取時 symbol 暫時為 object，故表單型別獨立定義
+type HoldingForm = Omit<Holding, "symbol"> & { symbol: string | any };
 import {
   fetchStockPrice,
   fetchMultipleStockPrices,
@@ -18,21 +20,10 @@ import {
 import { initStockCache } from "../services/stockListSync";
 import { searchStocksFromCache } from "../services/stockListApi";
 
-export interface Holding {
-  id: string;
-  symbol: string | any;
-  market: string;
-  name: string;
-  shares: number | null;
-  loaned_shares: number | null;
-  cost_basis: number | null;
-  current_price: number | null;
-  currency: string;
-}
+const store = useAssetManagerStore();
 
 // 狀態過濾
 const includeLoaned = ref(true);
-const mockHoldings = ref<Holding[]>([...seedInvestments]);
 
 // 新增 / 編輯邏輯
 const editVisible = ref(false);
@@ -42,7 +33,7 @@ const isFetchingPrice = ref(false);
 
 const searchResults = ref<any[]>([]);
 
-const editForm = ref<Holding>({
+const editForm = ref<HoldingForm>({
   id: "",
   symbol: "",
   market: "TW",
@@ -107,7 +98,7 @@ function openAdd() {
   editVisible.value = true;
 }
 
-function openEdit(h: Holding) {
+function openEdit(h: HoldingForm) {
   isEditing.value = true;
   editHasLoaned.value = (h.loaned_shares || 0) > 0;
   // 將字串 symbol 包成 object 給 AutoComplete 顯示
@@ -132,7 +123,7 @@ function onMarketChange() {
   searchResults.value = [];
 }
 
-function saveInvestment() {
+async function saveInvestment() {
   const shares = editForm.value.shares || 0;
   const loaned = editForm.value.loaned_shares || 0;
   if (loaned > shares) {
@@ -153,17 +144,18 @@ function saveInvestment() {
     finalSymbol = editForm.value.symbol as string;
   }
 
-  const payload: Holding = {
+  const payload = {
     ...editForm.value,
     symbol: finalSymbol,
-    name: finalName || finalSymbol, // 若無名稱用代號代替
+    name: finalName || finalSymbol,
   };
 
   if (isEditing.value) {
-    const idx = mockHoldings.value.findIndex((h) => h.id === payload.id);
-    if (idx !== -1) mockHoldings.value[idx] = payload;
+    const { id, ...updates } = payload;
+    await store.updateHolding(id, updates);
   } else {
-    mockHoldings.value.push(payload);
+    const { id: _id, ...newPayload } = payload;
+    await store.addHolding(newPayload);
   }
   editVisible.value = false;
 }
@@ -179,10 +171,10 @@ const fmtCurrency = (v: number, curr = "TWD") => {
 
 // 狀態過濾
 const twHoldings = computed(() =>
-  mockHoldings.value.filter((h) => h.market === "TW"),
+  store.holdings.filter((h) => h.market === "TW"),
 );
 const usHoldings = computed(() =>
-  mockHoldings.value.filter((h) => h.market === "US"),
+  store.holdings.filter((h) => h.market === "US"),
 );
 
 // --- 計算邏輯 ---
@@ -204,7 +196,7 @@ function calcCost(h: Holding) {
 const FX_RATE = 32;
 
 const totalInvestedTWD = computed(() => {
-  return mockHoldings.value.reduce((acc, h) => {
+  return store.holdings.reduce((acc, h) => {
     let val = calcValue(h);
     if (h.currency === "USD") val *= FX_RATE;
     return acc + val;
@@ -212,7 +204,7 @@ const totalInvestedTWD = computed(() => {
 });
 
 const totalPnLTWD = computed(() => {
-  return mockHoldings.value.reduce((acc, h) => {
+  return store.holdings.reduce((acc, h) => {
     let pnl = calcValue(h) - calcCost(h);
     if (h.currency === "USD") pnl *= FX_RATE;
     return acc + pnl;
@@ -225,13 +217,9 @@ const isRefreshingAll = ref(false);
 async function refreshPrices() {
   isRefreshingAll.value = true;
   try {
-    const symbols = mockHoldings.value.map((h) => h.symbol);
+    const symbols = store.holdings.map((h) => h.symbol);
     const prices = await fetchMultipleStockPrices(symbols);
-    mockHoldings.value.forEach((h) => {
-      if (prices[h.symbol] !== undefined) {
-        h.current_price = prices[h.symbol];
-      }
-    });
+    store.batchCacheHoldingPrices(prices);
   } finally {
     isRefreshingAll.value = false;
   }

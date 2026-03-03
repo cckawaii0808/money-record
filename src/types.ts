@@ -18,3 +18,15 @@ export interface MonthlyRecord {
   month: string; // YYYY-MM
   amount: number;
 }
+
+export interface Holding {
+  id: string;
+  symbol: string;
+  market: string;
+  name: string;
+  shares: number | null;
+  loaned_shares: number | null;
+  cost_basis: number | null;
+  current_price: number | null;
+  currency: string;
+}
