@@ -31,6 +31,12 @@ const dashboardItems = [
 ];
 const appItems = [
   { name: "records", path: "/records", icon: "pi pi-list", label: "記錄" },
+  {
+    name: "investments",
+    path: "/investments",
+    icon: "pi pi-chart-line",
+    label: "投資組合",
+  },
   { name: "settings", path: "/settings", icon: "pi pi-cog", label: "設定" },
 ];
 
@@ -58,7 +64,7 @@ async function logout() {
     <template v-else>
       <!-- 桌面側邊欄 -->
       <aside
-        class="hidden lg:flex flex-col w-[250px] min-h-[100dvh] bg-[var(--sidebar-bg)] shadow-[var(--sidebar-shadow)] sticky top-0 shrink-0 z-20"
+        class="hidden lg:flex flex-col w-[250px] min-h-[100dvh] bg-[var(--sidebar-bg)] shadow-[var(--sidebar-shadow)] shrink-0 z-20 lg:sticky lg:top-0 lg:h-screen overflow-y-auto"
       >
         <!--  標誌區塊 -->
         <div class="flex items-center gap-3 p-6 h-[80px]">
@@ -166,10 +172,10 @@ async function logout() {
       </aside>
 
       <!-- 主內容區 -->
-      <main class="flex-1 min-w-0 flex flex-col">
+      <main class="flex-1 min-w-0 flex flex-col relative">
         <!--  Top Bar (僅限電腦版顯示) -->
         <header
-          class="hidden lg:flex justify-between items-center h-[80px] px-6 bg-[var(--app-bg)]"
+          class="hidden lg:flex justify-between items-center h-[80px] px-6 bg-[var(--app-bg)]/95 backdrop-blur-md sticky top-0 z-[60] border-b border-[var(--line-soft)] lg:border-none"
         >
           <div class="flex items-center gap-4">
             <button

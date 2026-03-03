@@ -495,3 +495,28 @@ export const seedRecords: MonthlyRecord[] = [
   { accountId: "taishin-cc", month: "2025-02", amount: 0 },
   { accountId: "credit-loan", month: "2025-02", amount: 1256429 }
 ];
+
+export const seedInvestments = [
+  {
+    id: "inv-1",
+    symbol: "AAPL",
+    market: "US",
+    name: "Apple Inc.",
+    shares: 10.5,
+    loaned_shares: 0,
+    cost_basis: 170.5,
+    current_price: 185.3,
+    currency: "USD",
+  },
+  {
+    id: "inv-2",
+    symbol: "2330.TW",
+    market: "TW",
+    name: "台積電",
+    shares: 2000,
+    loaned_shares: 1000,
+    cost_basis: 550,
+    current_price: 880,
+    currency: "TWD",
+  },
+];
