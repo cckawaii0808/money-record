@@ -282,34 +282,37 @@ onMounted(() => {
             : 'flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all'
         "
       >
-        <div class="flex items-center gap-3 flex-wrap">
-          <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">投資組合</h1>
-          <Button
-            icon="pi pi-sync"
-            rounded
-            text
-            class="!w-8 !h-8 text-[var(--text-sub)] hover:bg-[var(--line-soft)]"
-            :class="{ 'animate-spin': isRefreshingAll }"
-            @click="refreshPrices"
-            title="更新最新報價"
-          />
-          <Button
-            icon="pi pi-plus"
-            rounded
-            text
-            class="!w-8 !h-8 text-[var(--text-sub)] hover:bg-[var(--line-soft)]"
-            @click="openAdd"
-            title="新增投資"
-          />
-        </div>
-        <div
-          class="flex items-center gap-3 bg-[var(--surface)] px-4 py-2 rounded-xl shadow-sm border border-[var(--line-soft)]"
-        >
-          <span class="text-sm font-semibold text-[var(--text-sub)]">包含借券金額</span>
-          <ToggleSwitch v-model="includeLoaned" />
-        </div>
+        <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">投資組合</h1>
       </div>
     </Teleport>
+
+    <!-- 頁面工具列：包含借券金額 + 更新報價 + 新增投資 -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div class="flex flex-wrap items-center gap-3">
+        <div
+          class="flex items-center gap-2 bg-[var(--surface)] px-3 py-1.5 rounded-lg shadow-sm border border-[var(--line-soft)]"
+        >
+          <span class="text-sm font-semibold text-[var(--text-sub)]"
+            >包含借券金額</span
+          >
+          <ToggleSwitch v-model="includeLoaned" />
+        </div>
+        <Button
+          label="更新報價"
+          icon="pi pi-sync"
+          size="small"
+          severity="secondary"
+          :loading="isRefreshingAll"
+          @click="refreshPrices"
+        />
+      </div>
+      <Button
+        label="新增投資"
+        icon="pi pi-plus"
+        size="small"
+        @click="openAdd"
+      />
+    </div>
 
     <!-- Apollo KPI 摘要區 (橫向卡片) -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

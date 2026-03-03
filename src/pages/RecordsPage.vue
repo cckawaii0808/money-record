@@ -151,34 +151,37 @@ const fmtTwd = (v: number) =>
       <div
         :class="
           isDesktop
-            ? 'flex items-center justify-between w-full gap-4'
+            ? 'grid grid-cols-3 items-center w-full'
             : 'flex justify-center mb-6 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4'
         "
       >
         <h1 v-if="isDesktop" class="text-2xl font-bold text-[var(--text-main)] m-0">每月記錄</h1>
-        <div
-          class="inline-flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-2xl shadow-sm border border-[var(--line-soft)]"
-        >
-          <Button
-            icon="pi pi-chevron-left"
-            text
-            rounded
-            @click="goToPrevMonth"
-            :disabled="isFirst"
-            class="text-[var(--text-sub)] !p-2 h-10 w-10"
-          />
-          <span class="w-36 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums">
-            {{ selectedMonth }}
-          </span>
-          <Button
-            icon="pi pi-chevron-right"
-            text
-            rounded
-            @click="goToNextMonth"
-            :disabled="isLast"
-            class="text-[var(--text-sub)] !p-2 h-10 w-10"
-          />
+        <div :class="isDesktop ? 'flex justify-center' : ''">
+          <div
+            class="inline-flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-2xl shadow-sm border border-[var(--line-soft)]"
+          >
+            <Button
+              icon="pi pi-chevron-left"
+              text
+              rounded
+              @click="goToPrevMonth"
+              :disabled="isFirst"
+              class="text-[var(--text-sub)] !p-2 h-10 w-10"
+            />
+            <span class="w-36 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums">
+              {{ selectedMonth }}
+            </span>
+            <Button
+              icon="pi pi-chevron-right"
+              text
+              rounded
+              @click="goToNextMonth"
+              :disabled="isLast"
+              class="text-[var(--text-sub)] !p-2 h-10 w-10"
+            />
+          </div>
         </div>
+        <div v-if="isDesktop"></div>
       </div>
     </Teleport>
 

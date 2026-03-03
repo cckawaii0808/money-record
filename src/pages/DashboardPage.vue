@@ -311,11 +311,14 @@ const donutOptions = computed(() => ({
       <div
         :class="
           isDesktop
-            ? 'flex items-center justify-between w-full gap-4'
+            ? 'grid grid-cols-3 items-center w-full'
             : 'flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4 sm:mx-0 sm:px-4 sm:py-4 sm:rounded-b-2xl transition-all'
         "
       >
         <h1 class="text-2xl font-bold text-[var(--text-main)] m-0">資產總覽</h1>
+        <div
+          :class="isDesktop ? 'flex justify-center' : ''"
+        >
         <div
           class="flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-xl shadow-sm border border-[var(--line-soft)]"
         >
@@ -344,6 +347,8 @@ const donutOptions = computed(() => ({
             class="text-[var(--text-sub)] !p-2 h-8 w-8"
           />
         </div>
+        </div>
+        <div></div>
       </div>
     </Teleport>
 

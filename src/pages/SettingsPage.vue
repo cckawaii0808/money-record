@@ -14,12 +14,15 @@ import Divider from "primevue/divider";
 import ConfirmDialog from "primevue/confirmdialog";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
+import { storeToRefs } from "pinia";
 import { useAssetManagerStore } from "../stores";
 import type { Account, AccountType, Currency } from "../types";
 
 const toast   = useToast();
 const confirm = useConfirm();
-const { isLoading, accounts, newAccount, addAccount, updateAccount, deleteAccount, accountDisplayName } = useAssetManagerStore();
+const _store  = useAssetManagerStore();
+const { isLoading, accounts, newAccount } = storeToRefs(_store);
+const { addAccount, updateAccount, deleteAccount, accountDisplayName } = _store;
 
 const assetAccounts = computed(() => accounts.value.filter(a => a.type === "asset"));
 const liabAccounts  = computed(() => accounts.value.filter(a => a.type === "liability"));
