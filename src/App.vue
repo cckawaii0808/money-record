@@ -5,6 +5,7 @@
 import { computed, ref, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import Toast from "primevue/toast";
+import ConfirmDialog from "primevue/confirmdialog";
 import Popover from "primevue/popover";
 import { useAuth } from "./composables/useAuth";
 
@@ -91,6 +92,7 @@ function isActive(path: string) {
 <template>
   <div class="min-h-[100dvh] bg-[var(--app-bg)]">
     <Toast position="top-center" />
+    <ConfirmDialog />
 
     <template v-if="!showNav">
       <router-view />
@@ -210,14 +212,19 @@ function isActive(path: string) {
           </button>
 
           <!-- 頁面標題 / 控制項 slot（各頁面透過 Teleport 注入） -->
-          <div id="app-header-slot" class="flex-1 flex items-center justify-between min-w-0 px-2"></div>
+          <div
+            id="app-header-slot"
+            class="flex-1 flex items-center justify-between min-w-0 px-2"
+          ></div>
 
           <!-- 右側：使用者資訊（可點擊展開 Popover） -->
           <div
             class="flex items-center gap-3 cursor-pointer select-none rounded-xl px-3 py-1.5 hover:bg-[var(--sidebar-active-bg)] transition-colors"
             @click="profileMenu.toggle($event)"
           >
-            <span class="text-sm font-medium text-[var(--text-sub)] hidden sm:block">
+            <span
+              class="text-sm font-medium text-[var(--text-sub)] hidden sm:block"
+            >
               {{ displayName }}
             </span>
             <img
@@ -241,10 +248,10 @@ function isActive(path: string) {
         <Popover ref="profileMenu">
           <div class="flex flex-col gap-0.5 p-1" style="min-width: 210px">
             <!-- 使用者資訊 -->
-            <div
-              class="px-3 py-2.5 mb-0.5 border-b border-[var(--line-soft)]"
-            >
-              <p class="font-bold text-sm text-[var(--text-main)] leading-tight">
+            <div class="px-3 py-2.5 mb-0.5 border-b border-[var(--line-soft)]">
+              <p
+                class="font-bold text-sm text-[var(--text-main)] leading-tight"
+              >
                 {{ displayName }}
               </p>
               <p class="text-xs text-[var(--text-sub)] mt-0.5">
@@ -256,7 +263,10 @@ function isActive(path: string) {
               class="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm font-medium text-left bg-transparent border-none cursor-pointer text-[var(--text-main)] hover:bg-[var(--sidebar-active-bg)] transition-colors font-[inherit]"
               @click="toggleTheme"
             >
-              <i :class="isDark ? 'pi pi-sun' : 'pi pi-moon'" class="text-base" />
+              <i
+                :class="isDark ? 'pi pi-sun' : 'pi pi-moon'"
+                class="text-base"
+              />
               <span>{{ isDark ? "切換淺色模式" : "切換深色模式" }}</span>
             </button>
             <!-- 登出 -->
@@ -300,4 +310,3 @@ function isActive(path: string) {
     </template>
   </div>
 </template>
-

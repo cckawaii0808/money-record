@@ -45,6 +45,20 @@ export function searchStocksFromCache(
         nameLower.includes(q)
       );
     })
+    .sort((a, b) => {
+      const aCode = a.code.toLowerCase();
+      const bCode = b.code.toLowerCase();
+      // Exact code match gets highest priority
+      if (aCode === q && bCode !== q) return -1;
+      if (bCode === q && aCode !== q) return 1;
+      // StarsWith code match gets second priority
+      const aStartsWith = aCode.startsWith(q);
+      const bStartsWith = bCode.startsWith(q);
+      if (aStartsWith && !bStartsWith) return -1;
+      if (!aStartsWith && bStartsWith) return 1;
+      // Default to sorting alphabetically by code if both or neither are prefix matches
+      return aCode.localeCompare(bCode);
+    })
     .slice(0, limit);
 }
 

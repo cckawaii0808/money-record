@@ -8,6 +8,8 @@ import InputNumber from "primevue/inputnumber";
 import ToggleSwitch from "primevue/toggleswitch";
 import AutoComplete from "primevue/autocomplete";
 import Tag from "primevue/tag";
+import { useToast } from "primevue/usetoast";
+import { useConfirm } from "primevue/useconfirm";
 import type { Holding } from "../types";
 import { useAssetManagerStore } from "../stores/assetManager";
 
@@ -21,6 +23,8 @@ import { initStockCache } from "../services/stockListSync";
 import { searchStocksFromCache } from "../services/stockListApi";
 
 const store = useAssetManagerStore();
+const toast = useToast();
+const confirm = useConfirm();
 
 // 狀態過濾
 const includeLoaned = ref(true);
@@ -41,7 +45,7 @@ const editForm = ref<HoldingForm>({
   shares: null,
   loaned_shares: null,
   cost_basis: null,
-  current_price: null,
+  current_price: 0,
   currency: "TWD",
 });
 
@@ -91,7 +95,7 @@ function openAdd() {
       shares: null,
       loaned_shares: null,
       cost_basis: null,
-      current_price: null,
+      current_price: 0,
       currency: "TWD",
     },
   };
@@ -118,7 +122,7 @@ function onMarketChange() {
   editForm.value.shares = null;
   editForm.value.loaned_shares = null;
   editForm.value.cost_basis = null;
-  editForm.value.current_price = null;
+  editForm.value.current_price = 0;
   editHasLoaned.value = false;
   searchResults.value = [];
 }
@@ -127,7 +131,12 @@ async function saveInvestment() {
   const shares = editForm.value.shares || 0;
   const loaned = editForm.value.loaned_shares || 0;
   if (loaned > shares) {
-    alert("借出股數不能大於持有股數");
+    toast.add({
+      severity: "error",
+      summary: "錯誤",
+      detail: "借出股數不能大於持有股數",
+      life: 3000,
+    });
     return;
   }
 
@@ -210,6 +219,41 @@ const totalPnLTWD = computed(() => {
     return acc + pnl;
   }, 0);
 });
+
+const totalLoanedTWD = computed(() => {
+  return store.holdings.reduce((acc, h) => {
+    const loaned = h.loaned_shares || 0;
+    let val = loaned * (h.current_price || 0);
+    if (h.currency === "USD") val *= FX_RATE;
+    return acc + val;
+  }, 0);
+});
+
+async function removeInvestment() {
+  confirm.require({
+    message: "確定要刪除這筆投資嗎？",
+    header: "",
+    rejectProps: {
+      label: "取消",
+      severity: "secondary",
+      text: true,
+    },
+    acceptProps: {
+      label: "刪除",
+      severity: "danger",
+    },
+    accept: async () => {
+      await store.deleteHolding(editForm.value.id);
+      editVisible.value = false;
+      toast.add({
+        severity: "success",
+        summary: "成功",
+        detail: "已成功刪除投資",
+        life: 3000,
+      });
+    },
+  });
+}
 
 // --- API 相關邏輯 ---
 const isRefreshingAll = ref(false);
@@ -321,7 +365,7 @@ onMounted(() => {
     </Teleport>
 
     <!-- Apollo KPI 摘要區 (橫向卡片) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
       <!-- 總投資現值 -->
       <div class="apollo-card flex flex-col justify-between h-[130px]">
         <div class="flex justify-between items-start">
@@ -366,6 +410,27 @@ onMounted(() => {
             class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500"
           >
             <i class="pi pi-dollar text-lg"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- 總借出市值 -->
+      <div class="apollo-card flex flex-col justify-between h-[130px]">
+        <div class="flex justify-between items-start">
+          <div class="flex flex-col gap-1.5">
+            <span class="text-[13px] font-bold text-[var(--text-main)]"
+              >總計借券市值 (TWD)</span
+            >
+            <span
+              class="text-[26px] font-black tabular-nums tracking-tight text-orange-500"
+            >
+              {{ fmtCurrency(totalLoanedTWD, "TWD") }}
+            </span>
+          </div>
+          <div
+            class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500"
+          >
+            <i class="pi pi-arrow-right-arrow-left text-lg"></i>
           </div>
         </div>
       </div>
@@ -583,12 +648,14 @@ onMounted(() => {
                 <div
                   class="flex items-center justify-between gap-2 w-full min-w-0 pr-1"
                 >
-                  <div class="flex items-center gap-2 min-w-0">
-                    <Tag
-                      :value="slotProps.option.code"
-                      severity="secondary"
-                      class="!text-[11px] !py-0.5 !px-1.5 font-mono"
-                    />
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-14 shrink-0 flex justify-center">
+                      <Tag
+                        :value="slotProps.option.code"
+                        severity="secondary"
+                        class="!text-[11px] !py-0.5 !px-1.5 font-mono w-full text-center"
+                      />
+                    </div>
                     <span
                       class="text-sm font-bold text-slate-700 truncate min-w-0"
                     >
@@ -606,11 +673,6 @@ onMounted(() => {
                 </div>
               </template>
             </AutoComplete>
-
-            <i
-              v-if="isFetchingPrice"
-              class="pi pi-spinner animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-            ></i>
           </div>
         </div>
 
@@ -657,9 +719,15 @@ onMounted(() => {
 
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-[13px] font-bold text-[var(--text-sub)]"
-              >市價 ({{ editForm.currency }})</label
-            >
+            <div class="flex items-center gap-2">
+              <label class="text-[13px] font-bold text-[var(--text-sub)]"
+                >市價 ({{ editForm.currency }})</label
+              >
+              <i
+                v-if="isFetchingPrice"
+                class="pi pi-spinner animate-spin text-[var(--primary)] text-sm"
+              ></i>
+            </div>
             <InputNumber
               v-model="editForm.current_price"
               class="w-full"
@@ -715,14 +783,25 @@ onMounted(() => {
       </div>
 
       <template #footer>
-        <div class="flex justify-end gap-2 pt-4">
-          <Button
-            label="取消"
-            severity="secondary"
-            text
-            @click="editVisible = false"
-          />
-          <Button label="儲存" severity="primary" @click="saveInvestment" />
+        <div class="flex justify-between gap-2 pt-4 w-full">
+          <div class="flex">
+            <Button
+              v-if="isEditing"
+              label="刪除"
+              severity="danger"
+              text
+              @click="removeInvestment"
+            />
+          </div>
+          <div class="flex justify-end gap-2">
+            <Button
+              label="取消"
+              severity="secondary"
+              text
+              @click="editVisible = false"
+            />
+            <Button label="儲存" severity="primary" @click="saveInvestment" />
+          </div>
         </div>
       </template>
     </Dialog>
