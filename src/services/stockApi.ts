@@ -65,9 +65,18 @@ async function getTwseData(): Promise<Record<string, number>> {
   const priceMap: Record<string, number> = {};
   try {
     // 1. 取得證交所 (上市) 每日收盤行情
-    const twseRes = await axios.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", { timeout: 10000 });
-    if (Array.isArray(twseRes.data)) {
-      twseRes.data.forEach((item: any) => {
+    let twseData = null;
+    try {
+      // 透過 allorigins 代理解決 CORS
+      const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+      const twseRes = await axios.get(proxyUrl, { timeout: 10000 });
+      twseData = JSON.parse(twseRes.data.contents);
+    } catch (err) {
+      console.warn("TWSE 抓取失敗：", err);
+    }
+
+    if (Array.isArray(twseData)) {
+      twseData.forEach((item: any) => {
         if (item.Code && item.ClosingPrice) {
           const price = parseFloat(item.ClosingPrice);
           if (!isNaN(price)) {
@@ -78,9 +87,18 @@ async function getTwseData(): Promise<Record<string, number>> {
     }
 
     // 2. 取得櫃買中心 (上櫃) 每日收盤行情
-    const tpexRes = await axios.get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes", { timeout: 10000 });
-    if (Array.isArray(tpexRes.data)) {
-      tpexRes.data.forEach((item: any) => {
+    let tpexData = null;
+    try {
+      // 同樣透過 allorigins 代理解決 CORS
+      const tpexProxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes');
+      const tpexRes = await axios.get(tpexProxyUrl, { timeout: 10000 });
+      tpexData = JSON.parse(tpexRes.data.contents);
+    } catch (err) {
+      console.warn("TPEx 抓取失敗：", err);
+    }
+
+    if (Array.isArray(tpexData)) {
+      tpexData.forEach((item: any) => {
         if (item.SecuritiesCompanyCode && item.Close) {
           const price = parseFloat(item.Close);
           if (!isNaN(price)) {
