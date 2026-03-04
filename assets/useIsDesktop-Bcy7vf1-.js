@@ -1,1 +1,0 @@
-import{aI as o,aQ as i,r as t}from"./index-CSfKU6Wb.js";function s(){const e=t(typeof window<"u"?window.innerWidth>=1024:!0);function n(){e.value=window.innerWidth>=1024}return o(()=>window.addEventListener("resize",n)),i(()=>window.removeEventListener("resize",n)),{isDesktop:e}}export{s as u};
