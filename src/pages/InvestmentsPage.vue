@@ -789,8 +789,17 @@ onMounted(() => {
 
         <div
           v-if="editHasLoaned"
-          class="flex flex-col gap-1.5 bg-orange-50/50 p-3 rounded-lg border border-orange-100"
+          class="flex flex-col gap-1.5 bg-orange-50/50 p-3 rounded-lg border border-orange-100 relative mt-2"
         >
+          <button
+            class="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"
+            @click="
+              editHasLoaned = false;
+              editForm.loaned_shares = 0;
+            "
+          >
+            <i class="pi pi-times"></i>
+          </button>
           <label class="text-[13px] font-bold text-orange-700"
             >已借出股數</label
           >
@@ -811,6 +820,16 @@ onMounted(() => {
                 ? (editForm.loaned_shares = 0)
                 : null
             "
+          />
+        </div>
+        <div v-else class="flex justify-start mt-1">
+          <Button
+            label="新增借券"
+            icon="pi pi-plus"
+            size="small"
+            text
+            class="!text-orange-600 hover:!bg-orange-50 !py-1 !px-2"
+            @click="editHasLoaned = true"
           />
         </div>
       </div>

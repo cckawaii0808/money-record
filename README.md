@@ -22,16 +22,54 @@ npm run dev
 
 > 需要 `.env` 設定 Supabase URL 與 Anon Key，詳見下方。
 
-## 環境變數
+## 開發環境與環境變數設定
 
-在專案根目錄建立 `.env`：
+要讓專案正常運作抓取美股即時報價與儲存您的資料，您需要設定對應的環境變數。
+請在專案根目錄建立一個 `.env.local` 檔案（可以複製 `.env.example` 來修改）。
 
+### 1. Supabase (資料庫與身分驗證)
+
+專案使用 Supabase 儲存資料，請依照以下步驟取得金鑰：
+
+1. 前往 [Supabase 官網](https://supabase.com/) 註冊並登入。
+2. 建立一個新的 Project。
+3. 進入專案的 **Project Settings** (左下角齒輪) -> **API**。
+4. 找到 **Project URL** 並複製到 `.env.local` 的 `VITE_SUPABASE_URL`。
+5. 找到 **Project API keys** 中的 `anon` `public` 金鑰，複製到 `.env.local` 的 `VITE_SUPABASE_ANON_KEY`。
+
+### 2. Finnhub (美股 API)
+
+專案使用 Finnhub 獲取免費用於商業的美股即時報價，請依照以下步驟取得金鑰：
+
+1. 前往 [Finnhub 官網](https://finnhub.io/) 註冊免費帳號 (Basic Free Plan)。
+2. 登入後進入 Dashboard (https://finnhub.io/dashboard)。
+3. 在上方會看到一串長達 40 個字元的 API Key (例如：`d6jo54prxxxxxxxxxx...`)。
+4. 將整串複製到 `.env.local` 的 `VITE_FINNHUB_API_KEY`。
+
+`.env.local` 範例：
+
+```env
+VITE_SUPABASE_URL=https://您的專案ID.supabase.co
+VITE_SUPABASE_ANON_KEY=您的長串ANON金鑰
+VITE_FINNHUB_API_KEY=您的40字元Finnhub金鑰
 ```
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-```
 
-## 頁面說明
+## GitHub Actions 正式環境部署設定
+
+如果您將專案 Fork 到自己的 GitHub 並希望透過 GitHub Pages 自動部署，請記得在 GitHub 設定您的金鑰 (Repository Secrets)：
+
+1. 進入您在 GitHub 的專案頁面。
+2. 點選 **Settings** 頁籤。
+3. 左側選單找到 **Secrets and variables** -> **Actions**。
+4. 點選右上角的 **New repository secret** 綠色按鈕。
+5. 分別新增以下三個 Secrets，名稱必須完全一致：
+   - `VITE_SUPABASE_URL` (貼上您的 Supabase URL)
+   - `VITE_SUPABASE_ANON_KEY` (貼上您的 Supabase Anon Key)
+   - `VITE_FINNHUB_API_KEY` (貼上您的 Finnhub API Key)
+
+_這些機密金鑰會在部署流程 (deploy.yml) 的 Build 階段被注入到您的正式版網頁中。_
+
+## 專案設定與執行頁面說明
 
 | 路由         | 功能                                                       |
 | ------------ | ---------------------------------------------------------- |
