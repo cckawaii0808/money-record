@@ -36,6 +36,7 @@ async function fetchWithProxy(targetUrl: string) {
 
 // Finnhub API Key 設定
 const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
+
 export async function searchStocks(query: string, market?: string) {
   if (!query || query.trim().length < 1) return [];
 
