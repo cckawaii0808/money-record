@@ -1,4 +1,4 @@
-import{B as a,s,z as l,o as p,c as u,m as d}from"./index-6N8YTg2J.js";var c=`
+import{B as a,s,z as l,o as p,c as u,m as d}from"./index-CuajB-Vd.js";var c=`
     .p-skeleton {
         display: block;
         overflow: hidden;
