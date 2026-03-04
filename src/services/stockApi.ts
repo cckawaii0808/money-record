@@ -1,38 +1,5 @@
 import axios from "axios";
-import { getProxyUrl, switchToNextProxy, PROXY_PROVIDERS } from "./proxyConfig";
-
-/**
- * 封裝 axios 請求，支援 Proxy Fallback
- */
-async function fetchWithProxy(targetUrl: string) {
-  let lastError = null;
-  // 嘗試所有可用的 Proxy
-  for (let i = 0; i < PROXY_PROVIDERS.length; i++) {
-    const proxyUrl = getProxyUrl(targetUrl, i);
-    try {
-      const res = await axios.get(proxyUrl, { timeout: 10000 });
-      
-      // 處理不同 Proxy 的回傳格式
-      let data = res.data;
-      
-      // allorigins 格式特殊，資料在 contents 欄位
-      if (data && typeof data === 'object' && 'contents' in data) {
-        try {
-          data = JSON.parse(data.contents);
-        } catch (e) {
-          // 如果解析失敗，跳過此代理
-          continue;
-        }
-      }
-      
-      return data;
-    } catch (error) {
-      console.warn(`[Proxy] 代理 ${PROXY_PROVIDERS[i].name} 請求失敗:`, error);
-      lastError = error;
-    }
-  }
-  throw lastError || new Error("All proxies failed");
-}
+import twStocksData from "../data/tw_stocks.json";
 
 // Finnhub API Key 設定
 const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
@@ -40,16 +7,16 @@ const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
 export async function searchStocks(query: string, market?: string) {
   if (!query || query.trim().length < 1) return [];
 
-  const q = encodeURIComponent(query.trim());
+  const q = query.trim();
 
-  // 1. 若為美股 (US)，改打 Finnhub API
+  // 1. 若為美股 (US)，打 Finnhub API
   if (market === "US") {
-    const finnhubUrl = `https://finnhub.io/api/v1/search?q=${q}&token=${FINNHUB_API_KEY}`;
+    const finnhubUrl = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(q)}&token=${FINNHUB_API_KEY}`;
     try {
       const res = await axios.get(finnhubUrl, { timeout: 10000 });
       if (res.data && res.data.result) {
         return res.data.result
-          // Finnhub 回傳有 Common Stock, ETF, ETP 等，我們過濾掉無用的，避免出現太多奇怪的結果
+          // Finnhub 回傳有 Common Stock, ETF, ETP 等，我們過濾掉無用的
           .filter((item: any) => !item.type || item.type === "Common Stock" || item.type.includes("ETF") || item.type.includes("ETP"))
           .map((item: any) => ({
             symbol: item.symbol,
@@ -65,32 +32,24 @@ export async function searchStocks(query: string, market?: string) {
     }
   }
 
-  // 2. 若為台股 (TW) 或未指定，使用原本的 Yahoo Finance 架構 (走代理)
-  const yfUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${q}&quotesCount=20&newsCount=0`;
+  // 2. 若為台股 (TW) 或未指定，全本地搜尋 tw_stocks.json (免 API 最穩定)
+  const lowerQ = q.toLowerCase();
+  
+  // 從本地 JSON 直接過濾 (最多取 30 筆)
+  const results = (twStocksData as any[])
+    .filter(item => 
+      (item.symbol && item.symbol.toLowerCase().includes(lowerQ)) || 
+      (item.name && item.name.toLowerCase().includes(lowerQ))
+    )
+    .slice(0, 30)
+    .map(item => ({
+      symbol: item.symbol,
+      code: item.symbol,
+      name: item.name,
+      exch: item.market || "TW"
+    }));
 
-  try {
-    const data = await fetchWithProxy(yfUrl);
-    if (data.quotes && Array.isArray(data.quotes)) {
-      return data.quotes
-        .filter((q: any) => q.quoteType === "EQUITY" || q.quoteType === "ETF")
-        .filter((q: any) => {
-          if (market === "TW") {
-            return q.symbol.endsWith(".TW") || q.symbol.endsWith(".TWO") || q.exchange === "TAI" || q.exchange === "TWO";
-          }
-          return true;
-        })
-        .map((q: any) => ({
-          symbol: q.symbol,
-          code: q.symbol,
-          name: q.shortname || q.longname || q.symbol,
-          exch: q.exchDisp || q.exchange || ''
-        }));
-    }
-    return [];
-  } catch (error) {
-    console.error("[stockApi] Yahoo Search error:", error);
-    return [];
-  }
+  return results;
 }
 
 // --- 台灣股市 Open API 快取機制 ---
