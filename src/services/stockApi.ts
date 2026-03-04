@@ -93,6 +93,54 @@ export async function searchStocks(query: string, market?: string) {
   }
 }
 
+// --- 台灣股市 Open API 快取機制 ---
+let twseCache: Record<string, number> | null = null;
+let twseCacheTime = 0;
+const CACHE_TTL = 1000 * 60 * 60; // 1小時快取
+
+async function getTwseData(): Promise<Record<string, number>> {
+  if (twseCache && Date.now() - twseCacheTime < CACHE_TTL) {
+    return twseCache;
+  }
+
+  const priceMap: Record<string, number> = {};
+  try {
+    // 1. 取得證交所 (上市) 每日收盤行情
+    const twseRes = await axios.get("https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL", { timeout: 10000 });
+    if (Array.isArray(twseRes.data)) {
+      twseRes.data.forEach((item: any) => {
+        if (item.Code && item.ClosingPrice) {
+          const price = parseFloat(item.ClosingPrice);
+          if (!isNaN(price)) {
+            priceMap[`${item.Code}.TW`] = price;
+          }
+        }
+      });
+    }
+
+    // 2. 取得櫃買中心 (上櫃) 每日收盤行情
+    const tpexRes = await axios.get("https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes", { timeout: 10000 });
+    if (Array.isArray(tpexRes.data)) {
+      tpexRes.data.forEach((item: any) => {
+        if (item.SecuritiesCompanyCode && item.Close) {
+          const price = parseFloat(item.Close);
+          if (!isNaN(price)) {
+            priceMap[`${item.SecuritiesCompanyCode}.TWO`] = price;
+          }
+        }
+      });
+    }
+
+    twseCache = priceMap;
+    twseCacheTime = Date.now();
+    return priceMap;
+  } catch (error) {
+    console.error("[stockApi] 取得台股 Open API 失敗:", error);
+    if (twseCache) return twseCache;
+    return {};
+  }
+}
+
 export async function fetchStockPrice(symbol: string): Promise<number | null> {
   let formattedSymbol = symbol.trim().toUpperCase();
   
@@ -118,20 +166,25 @@ export async function fetchStockPrice(symbol: string): Promise<number | null> {
     }
   }
 
-  // 2. 台股即時報價，走 Yahoo Finance 代理
-  const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${formattedSymbol}`;
-
+  // 2. 台股即時報價，走 Open API
   try {
-    const data = await fetchWithProxy(yfUrl);
-    const result = data?.chart?.result?.[0];
+    const twseData = await getTwseData();
+    if (twseData[formattedSymbol] !== undefined) {
+      return twseData[formattedSymbol];
+    }
     
-    if (result && result.meta && result.meta.regularMarketPrice) {
-      return result.meta.regularMarketPrice;
+    // 如果找不到，試試切換 .TW / .TWO 後綴互找
+    const altSymbol = formattedSymbol.endsWith(".TW") 
+      ? formattedSymbol.replace(".TW", ".TWO") 
+      : formattedSymbol.replace(".TWO", ".TW");
+      
+    if (twseData[altSymbol] !== undefined) {
+      return twseData[altSymbol];
     }
     
     return null;
   } catch (error) {
-    console.error(`[stockApi] Yahoo error fetching price for ${formattedSymbol}:`, error);
+    console.error(`[stockApi] TWSE error fetching price for ${formattedSymbol}:`, error);
     return null;
   }
 }
@@ -142,7 +195,13 @@ export async function fetchStockPrice(symbol: string): Promise<number | null> {
 export async function fetchMultipleStockPrices(symbols: string[]): Promise<Record<string, number>> {
   const priceMap: Record<string, number> = {};
   
-  // 避免併發過多被阻擋，這裡用簡單的 Promise.all
+  // 先嘗試拉一次台股資料 (確保快取準備好，可以加速)
+  const hasTaiwanStocks = symbols.some(s => /^\d{4}$/.test(s) || s.endsWith(".TW") || s.endsWith(".TWO"));
+  if (hasTaiwanStocks) {
+    await getTwseData();
+  }
+  
+  // 避免併發過多被阻擋
   const promises = symbols.map(async (sym) => {
     const price = await fetchStockPrice(sym);
     if (price !== null) {
