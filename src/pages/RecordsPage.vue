@@ -10,14 +10,20 @@ import Button from "primevue/button";
 import InputNumber from "primevue/inputnumber";
 import Dialog from "primevue/dialog";
 import Skeleton from "primevue/skeleton";
+import InputText from "primevue/inputtext";
+import Select from "primevue/select";
+import ConfirmDialog from "primevue/confirmdialog";
+import Divider from "primevue/divider";
 import { storeToRefs } from "pinia";
 import { useToast } from "primevue/usetoast";
+import { useConfirm } from "primevue/useconfirm";
 import { useAssetManagerStore } from "../stores";
-import type { MonthlyRecord, Account } from "../types";
+import type { MonthlyRecord, Account, AccountType, Currency } from "../types";
 
 const toast = useToast();
+const confirm = useConfirm();
 const assetManager = useAssetManagerStore();
-const { isLoading, accounts, selectedMonth, months } =
+const { isLoading, accounts, selectedMonth, months, newAccount } =
   storeToRefs(assetManager);
 
 const {
@@ -26,6 +32,9 @@ const {
   bulkUpsertMonthlyRecords,
   formatCurrency,
   accountDisplayName,
+  addAccount,
+  updateAccount,
+  deleteAccount,
 } = assetManager;
 
 // --- 月份摘要 ---
@@ -136,6 +145,107 @@ function onInputEnter() {
   save();
 }
 
+// --- 帳戶管理 (來自舊 SettingsPage) ---
+const typeOptions = [
+  { label: "資產", value: "asset" },
+  { label: "負債", value: "liability" },
+];
+const currencyOptions = [
+  { label: "TWD", value: "TWD" },
+  { label: "USD", value: "USD" },
+  { label: "JPY", value: "JPY" },
+  { label: "EUR", value: "EUR" },
+];
+
+// 新增帳戶
+const addVisible = ref(false);
+const addForm = ref({
+  name: "",
+  type: "asset" as AccountType,
+  currency: "TWD" as Currency,
+  category: "",
+  alias: "",
+});
+const isSavingAdd = ref(false);
+
+function openAddAccount() {
+  addForm.value = {
+    name: "",
+    type: "asset",
+    currency: "TWD",
+    category: "",
+    alias: "",
+  };
+  addVisible.value = true;
+}
+
+async function submitAdd() {
+  if (!addForm.value.name.trim()) {
+    toast.add({ severity: "warn", summary: "請填寫帳戶名稱", life: 2000 });
+    return;
+  }
+  isSavingAdd.value = true;
+  try {
+    Object.assign(newAccount.value, addForm.value);
+    await addAccount();
+    toast.add({ severity: "success", summary: "帳戶新增成功", life: 2000 });
+    addVisible.value = false;
+  } catch {
+    toast.add({ severity: "error", summary: "新增失敗", life: 3000 });
+  } finally {
+    isSavingAdd.value = false;
+  }
+}
+
+// 編輯帳戶
+const editAccVisible = ref(false);
+const editAccForm = ref<Partial<Account>>({});
+const isSavingEditAcc = ref(false);
+
+function openEditAcc(acc: Account, event: Event) {
+  event.stopPropagation();
+  editAccForm.value = { ...acc };
+  editAccVisible.value = true;
+}
+
+async function submitEditAcc() {
+  if (!editAccForm.value.name?.trim()) {
+    toast.add({ severity: "warn", summary: "請填寫帳戶名稱", life: 2000 });
+    return;
+  }
+  isSavingEditAcc.value = true;
+  try {
+    await updateAccount(editAccForm.value as Account);
+    toast.add({ severity: "success", summary: "更新成功", life: 2000 });
+    editAccVisible.value = false;
+  } catch {
+    toast.add({ severity: "error", summary: "更新失敗", life: 3000 });
+  } finally {
+    isSavingEditAcc.value = false;
+  }
+}
+
+// 刪除帳戶
+function confirmDeleteAcc(acc: Account, event: Event) {
+  event.stopPropagation();
+  confirm.require({
+    message: `確定要刪除「${accountDisplayName(acc)}」整個帳戶與其所有歷史紀錄嗎？`,
+    header: "刪除帳戶",
+    icon: "pi pi-exclamation-triangle",
+    acceptLabel: "確定刪除",
+    rejectLabel: "取消",
+    acceptClass: "p-button-danger",
+    accept: async () => {
+      try {
+        await deleteAccount(acc.id);
+        toast.add({ severity: "success", summary: "已刪除", life: 2000 });
+      } catch {
+        toast.add({ severity: "error", summary: "刪除失敗", life: 3000 });
+      }
+    },
+  });
+}
+
 const fmtTwd = (v: number) =>
   new Intl.NumberFormat("zh-TW", {
     style: "currency",
@@ -146,6 +256,8 @@ const fmtTwd = (v: number) =>
 
 <template>
   <div class="max-w-5xl mx-auto px-4 pt-4 sm:pt-6 pb-24 relative">
+    <ConfirmDialog />
+
     <!-- 月份選擇器：桌面版 Teleport 到 App.vue header，手機版 sticky -->
     <Teleport defer to="#app-header-slot" :disabled="!isDesktop">
       <div
@@ -192,9 +304,26 @@ const fmtTwd = (v: number) =>
             />
           </div>
         </div>
-        <div v-if="isDesktop"></div>
+        <div v-if="isDesktop" class="flex justify-end gap-2 pr-2">
+          <Button
+            label="新增帳戶"
+            icon="pi pi-plus"
+            size="small"
+            @click="openAddAccount"
+          />
+        </div>
       </div>
     </Teleport>
+
+    <!-- 在手機版顯示新增帳戶按鈕 -->
+    <div v-if="!isDesktop" class="flex justify-end mb-4 px-1">
+      <Button
+        label="新增帳戶"
+        icon="pi pi-plus"
+        size="small"
+        @click="openAddAccount"
+      />
+    </div>
 
     <!-- Apollo KPI 摘要區 (分離的三張卡片) -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -286,8 +415,11 @@ const fmtTwd = (v: number) =>
         <div v-else class="flex flex-col gap-6">
           <!-- 照分類顯示 -->
           <div v-for="(accounts, catName) in assetCategories" :key="catName">
-            <h3 class="text-xs font-bold text-[var(--text-sub)] mb-2 px-1">
+            <h3
+              class="flex items-center gap-2 text-xs font-bold text-[var(--text-sub)] mb-2 px-1"
+            >
               {{ catName }}
+              <Divider type="dashed" class="!my-0 !flex-1" />
             </h3>
             <div class="flex flex-col gap-3">
               <div
@@ -321,36 +453,59 @@ const fmtTwd = (v: number) =>
                   </div>
                 </div>
 
-                <!-- 卡片右側 (金額與漲跌) -->
+                <!-- 卡片右側 (金額與漲跌 + 動作按鈕) -->
                 <div class="flex items-center justify-end gap-3 shrink-0 ml-2">
-                  <div
-                    class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--text-main)] text-right"
-                  >
-                    {{
-                      formatCurrency(
-                        amountAtMonth(acc.id, selectedMonth),
-                        acc.currency,
-                      )
-                    }}
+                  <div class="flex flex-col sm:items-end">
+                    <div
+                      class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--text-main)] text-right"
+                    >
+                      {{
+                        formatCurrency(
+                          amountAtMonth(acc.id, selectedMonth),
+                          acc.currency,
+                        )
+                      }}
+                    </div>
+                    <div class="flex items-center justify-end w-16 sm:w-24">
+                      <span
+                        v-if="deltaFor(acc) !== 0"
+                        class="text-[12px] sm:text-[13px] font-bold tabular-nums"
+                        :class="
+                          deltaFor(acc) > 0
+                            ? 'text-[var(--positive)]'
+                            : 'text-[var(--negative)]'
+                        "
+                      >
+                        {{ deltaFor(acc) > 0 ? "+" : ""
+                        }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
+                      </span>
+                      <span
+                        v-else
+                        class="text-[12px] sm:text-[13px] font-bold text-[var(--text-muted)]"
+                        >-</span
+                      >
+                    </div>
                   </div>
-                  <div class="flex items-center justify-end w-16 sm:w-24">
-                    <span
-                      v-if="deltaFor(acc) !== 0"
-                      class="text-[12px] sm:text-[13px] font-bold tabular-nums"
-                      :class="
-                        deltaFor(acc) > 0
-                          ? 'text-[var(--positive)]'
-                          : 'text-[var(--negative)]'
-                      "
-                    >
-                      {{ deltaFor(acc) > 0 ? "+" : ""
-                      }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
-                    </span>
-                    <span
-                      v-else
-                      class="text-[12px] sm:text-[13px] font-bold text-[var(--text-muted)]"
-                      >-</span
-                    >
+                  <!-- 設定動作按鈕 (防止冒泡觸發卡片點擊) -->
+                  <div
+                    class="flex gap-1 shrink-0 bg-gray-50/50 sm:bg-transparent rounded-lg p-1 sm:p-0"
+                  >
+                    <Button
+                      icon="pi pi-pencil"
+                      rounded
+                      text
+                      severity="secondary"
+                      size="small"
+                      @click.stop="openEditAcc(acc, $event)"
+                    />
+                    <Button
+                      icon="pi pi-trash"
+                      rounded
+                      text
+                      severity="danger"
+                      size="small"
+                      @click.stop="confirmDeleteAcc(acc, $event)"
+                    />
                   </div>
                 </div>
               </div>
@@ -369,8 +524,11 @@ const fmtTwd = (v: number) =>
         <div class="flex flex-col gap-6">
           <!-- 照分類顯示 -->
           <div v-for="(accounts, catName) in liabCategories" :key="catName">
-            <h3 class="text-xs font-bold text-[var(--text-sub)] mb-2 px-1">
+            <h3
+              class="flex items-center gap-2 text-xs font-bold text-[var(--text-sub)] mb-2 px-1"
+            >
               {{ catName }}
+              <Divider type="dashed" class="!my-0 !flex-1" />
             </h3>
             <div class="flex flex-col gap-3">
               <div
@@ -406,34 +564,57 @@ const fmtTwd = (v: number) =>
 
                 <!-- 卡片右側 -->
                 <div class="flex items-center justify-end gap-3 shrink-0 ml-2">
-                  <div
-                    class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--negative)] text-right"
-                  >
-                    {{
-                      formatCurrency(
-                        amountAtMonth(acc.id, selectedMonth),
-                        acc.currency,
-                      )
-                    }}
+                  <div class="flex flex-col sm:items-end">
+                    <div
+                      class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--negative)] text-right"
+                    >
+                      {{
+                        formatCurrency(
+                          amountAtMonth(acc.id, selectedMonth),
+                          acc.currency,
+                        )
+                      }}
+                    </div>
+                    <div class="flex items-center justify-end w-16 sm:w-24">
+                      <span
+                        v-if="deltaFor(acc) !== 0"
+                        class="text-[12px] sm:text-[13px] font-bold tabular-nums"
+                        :class="
+                          deltaFor(acc) > 0
+                            ? 'text-[var(--negative)]'
+                            : 'text-[var(--positive)]'
+                        "
+                      >
+                        {{ deltaFor(acc) > 0 ? "+" : ""
+                        }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
+                      </span>
+                      <span
+                        v-else
+                        class="text-[12px] sm:text-[13px] font-bold text-[var(--text-muted)]"
+                        >-</span
+                      >
+                    </div>
                   </div>
-                  <div class="flex items-center justify-end w-16 sm:w-24">
-                    <span
-                      v-if="deltaFor(acc) !== 0"
-                      class="text-[12px] sm:text-[13px] font-bold tabular-nums"
-                      :class="
-                        deltaFor(acc) > 0
-                          ? 'text-[var(--negative)]'
-                          : 'text-[var(--positive)]'
-                      "
-                    >
-                      {{ deltaFor(acc) > 0 ? "+" : ""
-                      }}{{ formatCurrency(deltaFor(acc), acc.currency) }}
-                    </span>
-                    <span
-                      v-else
-                      class="text-[12px] sm:text-[13px] font-bold text-[var(--text-muted)]"
-                      >-</span
-                    >
+                  <!-- 設定動作按鈕 (防止冒泡觸發卡片點擊) -->
+                  <div
+                    class="flex gap-1 shrink-0 bg-red-50/50 sm:bg-transparent rounded-lg p-1 sm:p-0"
+                  >
+                    <Button
+                      icon="pi pi-pencil"
+                      rounded
+                      text
+                      severity="secondary"
+                      size="small"
+                      @click.stop="openEditAcc(acc, $event)"
+                    />
+                    <Button
+                      icon="pi pi-trash"
+                      rounded
+                      text
+                      severity="danger"
+                      size="small"
+                      @click.stop="confirmDeleteAcc(acc, $event)"
+                    />
                   </div>
                 </div>
               </div>
@@ -443,7 +624,120 @@ const fmtTwd = (v: number) =>
       </section>
     </div>
 
-    <!-- 編輯 Dialog -->
+    <!-- 新增帳戶 Dialog -->
+    <Dialog
+      v-model:visible="addVisible"
+      header="新增帳戶"
+      modal
+      :draggable="false"
+      style="width: min(400px, 92vw)"
+    >
+      <div class="flex flex-col gap-3.5 py-2">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >帳戶名稱 *</label
+          ><InputText v-model="addForm.name" placeholder="例：國泰主帳" fluid />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >別名</label
+          ><InputText v-model="addForm.alias" placeholder="選填" fluid />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >類型</label
+          ><Select
+            v-model="addForm.type"
+            :options="typeOptions"
+            optionLabel="label"
+            optionValue="value"
+            fluid
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >幣別</label
+          ><Select
+            v-model="addForm.currency"
+            :options="currencyOptions"
+            optionLabel="label"
+            optionValue="value"
+            fluid
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >分類</label
+          ><InputText
+            v-model="addForm.category"
+            placeholder="例：生活費、投資"
+            fluid
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="取消"
+          text
+          severity="secondary"
+          @click="addVisible = false"
+        />
+        <Button label="新增" :loading="isSavingAdd" @click="submitAdd" />
+      </template>
+    </Dialog>
+
+    <!-- 編輯帳戶 Dialog -->
+    <Dialog
+      v-model:visible="editAccVisible"
+      header="編輯帳戶"
+      modal
+      :draggable="false"
+      style="width: min(400px, 92vw)"
+    >
+      <div class="flex flex-col gap-3.5 py-2" v-if="editAccForm.id">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >帳戶名稱 *</label
+          ><InputText v-model="editAccForm.name" fluid />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >別名</label
+          ><InputText v-model="editAccForm.alias" fluid />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >幣別</label
+          ><Select
+            v-model="editAccForm.currency"
+            :options="currencyOptions"
+            optionLabel="label"
+            optionValue="value"
+            fluid
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-semibold text-[var(--text-sub)]"
+            >分類</label
+          ><InputText v-model="editAccForm.category" fluid />
+        </div>
+      </div>
+      <template #footer>
+        <Button
+          label="取消"
+          text
+          severity="secondary"
+          @click="editAccVisible = false"
+        />
+        <Button
+          label="儲存"
+          :loading="isSavingEditAcc"
+          @click="submitEditAcc"
+        />
+      </template>
+    </Dialog>
+
+    <!-- 編輯當月金額 Dialog -->
     <Dialog
       v-model:visible="editVisible"
       :header="editAccount ? accountDisplayName(editAccount) : '編輯'"

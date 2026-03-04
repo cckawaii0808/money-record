@@ -256,14 +256,58 @@ async function removeInvestment() {
       severity: "danger",
     },
     accept: async () => {
-      await store.deleteHolding(editForm.value.id);
-      editVisible.value = false;
-      toast.add({
-        severity: "success",
-        summary: "成功",
-        detail: "已成功刪除投資",
-        life: 3000,
-      });
+      try {
+        await store.deleteHolding(editForm.value.id);
+        toast.add({
+          severity: "success",
+          summary: "成功",
+          detail: "投資紀錄已刪除",
+          life: 3000,
+        });
+        editVisible.value = false;
+      } catch (err: any) {
+        toast.add({
+          severity: "error",
+          summary: "錯誤",
+          detail: err.message || "刪除失敗",
+          life: 3000,
+        });
+      }
+    },
+  });
+}
+
+function confirmDeleteInvest(h: Holding) {
+  confirm.require({
+    message: `確定要刪除「${h.name || h.symbol}」的投資紀錄嗎？`,
+    header: "刪除投資",
+    icon: "pi pi-exclamation-triangle",
+    rejectProps: {
+      label: "取消",
+      severity: "secondary",
+      outlined: true,
+    },
+    acceptProps: {
+      label: "刪除",
+      severity: "danger",
+    },
+    accept: async () => {
+      try {
+        await store.deleteHolding(h.id);
+        toast.add({
+          severity: "success",
+          summary: "成功",
+          detail: "投資紀錄已刪除",
+          life: 3000,
+        });
+      } catch (err: any) {
+        toast.add({
+          severity: "error",
+          summary: "錯誤",
+          detail: err.message || "刪除失敗",
+          life: 3000,
+        });
+      }
     },
   });
 }
@@ -463,8 +507,7 @@ onMounted(() => {
           <div
             v-for="h in twHoldings"
             :key="h.id"
-            class="apollo-card !p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:-translate-y-[1px] hover:border-[var(--primary)] transition-all"
-            @click="openEdit(h)"
+            class="apollo-card !p-3 sm:!p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between transition-all"
           >
             <!-- 左側: 名字與單位 -->
             <div class="flex items-center gap-3 min-w-0 mb-3 sm:mb-0">
@@ -492,24 +535,48 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- 右側: 現值與損益 -->
-            <div class="flex flex-col items-end shrink-0 ml-2">
-              <span
-                class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--text-main)]"
+            <!-- 右側: 現值與損益 + 按鈕 -->
+            <div
+              class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0 mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-none border-gray-100"
+            >
+              <div class="flex flex-col sm:items-end">
+                <span
+                  class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--text-main)]"
+                >
+                  {{ fmtCurrency(calcValue(h), h.currency) }}
+                </span>
+                <span
+                  class="text-[12px] sm:text-[13px] font-bold tabular-nums"
+                  :class="
+                    calcValue(h) - calcCost(h) >= 0
+                      ? 'text-[var(--positive)]'
+                      : 'text-[var(--negative)]'
+                  "
+                >
+                  {{ calcValue(h) - calcCost(h) > 0 ? "+" : ""
+                  }}{{ fmtCurrency(calcValue(h) - calcCost(h), h.currency) }}
+                </span>
+              </div>
+              <div
+                class="flex gap-1 shrink-0 bg-gray-50/50 sm:bg-transparent rounded-lg p-1 sm:p-0"
               >
-                {{ fmtCurrency(calcValue(h), h.currency) }}
-              </span>
-              <span
-                class="text-[12px] sm:text-[13px] font-bold tabular-nums"
-                :class="
-                  calcValue(h) - calcCost(h) >= 0
-                    ? 'text-[var(--positive)]'
-                    : 'text-[var(--negative)]'
-                "
-              >
-                {{ calcValue(h) - calcCost(h) > 0 ? "+" : ""
-                }}{{ fmtCurrency(calcValue(h) - calcCost(h), h.currency) }}
-              </span>
+                <Button
+                  icon="pi pi-pencil"
+                  rounded
+                  text
+                  severity="secondary"
+                  size="small"
+                  @click="openEdit(h as any)"
+                />
+                <Button
+                  icon="pi pi-trash"
+                  rounded
+                  text
+                  severity="danger"
+                  size="small"
+                  @click="confirmDeleteInvest(h)"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -527,8 +594,7 @@ onMounted(() => {
           <div
             v-for="h in usHoldings"
             :key="h.id"
-            class="apollo-card !p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between cursor-pointer hover:-translate-y-[1px] hover:border-[var(--primary)] transition-all"
-            @click="openEdit(h)"
+            class="apollo-card !p-3 sm:!p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between transition-all"
           >
             <!-- 左側: 名字與單位 -->
             <div class="flex items-center gap-3 min-w-0 mb-3 sm:mb-0">
@@ -556,24 +622,48 @@ onMounted(() => {
               </div>
             </div>
 
-            <!-- 右側: 現值與損益 -->
-            <div class="flex flex-col items-end shrink-0 ml-2">
-              <span
-                class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--text-main)]"
+            <!-- 右側: 現值與損益 + 按鈕 -->
+            <div
+              class="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0 mt-3 sm:mt-0 pt-3 sm:pt-0 border-t sm:border-none border-gray-100"
+            >
+              <div class="flex flex-col sm:items-end">
+                <span
+                  class="text-[15px] sm:text-[18px] font-black tabular-nums text-[var(--text-main)]"
+                >
+                  {{ fmtCurrency(calcValue(h), h.currency) }}
+                </span>
+                <span
+                  class="text-[12px] sm:text-[13px] font-bold tabular-nums"
+                  :class="
+                    calcValue(h) - calcCost(h) >= 0
+                      ? 'text-[var(--positive)]'
+                      : 'text-[var(--negative)]'
+                  "
+                >
+                  {{ calcValue(h) - calcCost(h) > 0 ? "+" : ""
+                  }}{{ fmtCurrency(calcValue(h) - calcCost(h), h.currency) }}
+                </span>
+              </div>
+              <div
+                class="flex gap-1 shrink-0 bg-gray-50/50 sm:bg-transparent rounded-lg p-1 sm:p-0"
               >
-                {{ fmtCurrency(calcValue(h), h.currency) }}
-              </span>
-              <span
-                class="text-[12px] sm:text-[13px] font-bold tabular-nums"
-                :class="
-                  calcValue(h) - calcCost(h) >= 0
-                    ? 'text-[var(--positive)]'
-                    : 'text-[var(--negative)]'
-                "
-              >
-                {{ calcValue(h) - calcCost(h) > 0 ? "+" : ""
-                }}{{ fmtCurrency(calcValue(h) - calcCost(h), h.currency) }}
-              </span>
+                <Button
+                  icon="pi pi-pencil"
+                  rounded
+                  text
+                  severity="secondary"
+                  size="small"
+                  @click="openEdit(h as any)"
+                />
+                <Button
+                  icon="pi pi-trash"
+                  rounded
+                  text
+                  severity="danger"
+                  size="small"
+                  @click="confirmDeleteInvest(h)"
+                />
+              </div>
             </div>
           </div>
         </div>
