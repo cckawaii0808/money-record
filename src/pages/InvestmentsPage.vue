@@ -18,6 +18,7 @@ type HoldingForm = Omit<Holding, "symbol"> & { symbol: string | any };
 import {
   fetchStockPrice,
   fetchMultipleStockPrices,
+  searchStocks,
 } from "../services/stockApi";
 import { initStockCache } from "../services/stockListSync";
 import { searchStocksFromCache } from "../services/stockListApi";
@@ -34,6 +35,7 @@ const editVisible = ref(false);
 const isEditing = ref(false);
 const editHasLoaned = ref(false);
 const isFetchingPrice = ref(false);
+const isSearching = ref(false);
 
 const searchResults = ref<any[]>([]);
 
@@ -52,14 +54,25 @@ const editForm = ref<HoldingForm>({
 let searchTimeout: any = null;
 
 /**
- * 搜尋股票：優先從記憶體快取即時搜尋（無延遲），
- * 若快取尚未就緒才 fallback 到 Yahoo Finance API。
+ * 搜尋股票：
+ * - 台股 (TW)：優先從記憶體快取即時搜尋（無延遲）
+ * - 美股 (US)：透過 Yahoo Finance 即時搜尋 (防抖 300ms)
  */
-function onSearchStock(event: any) {
-  searchResults.value = searchStocksFromCache(
-    event.query,
-    editForm.value.market,
-  );
+async function onSearchStock(event: any) {
+  if (editForm.value.market === "TW") {
+    searchResults.value = searchStocksFromCache(event.query, "TW");
+  } else {
+    // US
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(async () => {
+      isSearching.value = true;
+      try {
+        searchResults.value = await searchStocks(event.query, "US");
+      } finally {
+        isSearching.value = false;
+      }
+    }, 300);
+  }
 }
 
 const marketOptions = [
@@ -662,17 +675,37 @@ onMounted(() => {
                       {{ slotProps.option.name }}
                     </span>
                   </div>
-                  <Tag
-                    :value="slotProps.option.exch === 'TAI' ? '上市' : '上櫃'"
-                    :severity="
-                      slotProps.option.exch === 'TAI' ? 'info' : 'success'
-                    "
-                    rounded
-                    class="!text-[10px] !py-0 !px-1.5"
-                  />
+                  <div class="flex items-center gap-1">
+                    <Tag
+                      v-if="slotProps.option.exch === 'TAI'"
+                      value="上市"
+                      severity="info"
+                      rounded
+                      class="!text-[10px] !py-0 !px-1.5"
+                    />
+                    <Tag
+                      v-else-if="slotProps.option.exch === 'TWO'"
+                      value="上櫃"
+                      severity="success"
+                      rounded
+                      class="!text-[10px] !py-0 !px-1.5"
+                    />
+                    <Tag
+                      v-else-if="slotProps.option.exch"
+                      :value="String(slotProps.option.exch).substring(0, 4)"
+                      severity="secondary"
+                      rounded
+                      class="!text-[10px] !py-0 !px-1.5"
+                    />
+                  </div>
                 </div>
               </template>
             </AutoComplete>
+
+            <i
+              v-if="isSearching"
+              class="pi pi-spinner animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-[var(--primary)] pointer-events-none"
+            ></i>
           </div>
         </div>
 
