@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/twse",
+      "destination": "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL"
+    },
+    {
+      "source": "/api/tpex",
+      "destination": "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes"
+    }
+  ]
+}
