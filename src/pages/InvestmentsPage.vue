@@ -8,6 +8,7 @@ import InputNumber from "primevue/inputnumber";
 import ToggleSwitch from "primevue/toggleswitch";
 import AutoComplete from "primevue/autocomplete";
 import Tag from "primevue/tag";
+import Select from "primevue/select";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
 import type { Holding } from "../types";
@@ -22,6 +23,7 @@ import {
 } from "../services/stockApi";
 import { initStockCache } from "../services/stockListSync";
 import { searchStocksFromCache } from "../services/stockListApi";
+import { getCurrentMonth } from "../utils/monthUtils";
 
 const store = useAssetManagerStore();
 const toast = useToast();
@@ -191,6 +193,11 @@ const fmtCurrency = (v: number, curr = "TWD") => {
   }).format(v);
 };
 
+/** 移除台股後綴 (.TW / .TWO) 用於顯示 */
+const fmtSymbol = (sym: string) => {
+  return sym.replace(/\.(TW|TWO)$/i, "");
+};
+
 // 狀態過濾
 const twHoldings = computed(() =>
   store.holdings.filter((h) => h.market === "TW"),
@@ -241,6 +248,106 @@ const totalLoanedTWD = computed(() => {
     return acc + val;
   }, 0);
 });
+
+// Sync logic state
+const syncVisible = ref(false);
+const syncMarket = ref<"ALL" | "TW" | "US">("ALL");
+const syncAccountTW = ref<string>("");
+const syncAccountUS = ref<string>("");
+
+// Sync computed
+const accountOptionsForSyncTW = computed(() => {
+  return store.accounts
+    .filter((a) => a.type === "asset" && a.currency === "TWD")
+    .map((a) => ({ label: a.name, value: a.id }));
+});
+
+const accountOptionsForSyncUS = computed(() => {
+  return store.accounts
+    .filter((a) => a.type === "asset" && a.currency === "USD")
+    .map((a) => ({ label: a.name, value: a.id }));
+});
+
+const twTotalSyncValue = computed(() => {
+  return twHoldings.value.reduce((acc, h) => acc + calcValue(h), 0);
+});
+
+const usTotalSyncValue = computed(() => {
+  return usHoldings.value.reduce((acc, h) => acc + calcValue(h), 0); // Native USD value
+});
+
+function openSync() {
+  syncMarket.value = "ALL";
+  syncVisible.value = true;
+}
+
+async function confirmSync() {
+  const entries: Array<{ accountId: string; amount: number }> = [];
+
+  if (syncMarket.value === "ALL" || syncMarket.value === "TW") {
+    if (!syncAccountTW.value) {
+      toast.add({
+        severity: "error",
+        summary: "錯誤",
+        detail: "請選擇台股同步目標帳戶",
+        life: 3000,
+      });
+      return;
+    }
+    entries.push({
+      accountId: syncAccountTW.value,
+      amount: Math.round(twTotalSyncValue.value),
+    });
+  }
+
+  if (syncMarket.value === "ALL" || syncMarket.value === "US") {
+    if (!syncAccountUS.value) {
+      toast.add({
+        severity: "error",
+        summary: "錯誤",
+        detail: "請選擇美股同步目標帳戶",
+        life: 3000,
+      });
+      return;
+    }
+    entries.push({
+      accountId: syncAccountUS.value,
+      amount: Math.round(usTotalSyncValue.value),
+    });
+  }
+
+  if (entries.length === 0) return;
+
+  try {
+    const result = await store.bulkUpsertMonthlyRecords(
+      getCurrentMonth(),
+      entries,
+    );
+    if (result.type === "success") {
+      toast.add({
+        severity: "success",
+        summary: "同步成功",
+        detail: result.message,
+        life: 3000,
+      });
+      syncVisible.value = false;
+    } else {
+      toast.add({
+        severity: "error",
+        summary: "同步失敗",
+        detail: result.message,
+        life: 3000,
+      });
+    }
+  } catch (e) {
+    toast.add({
+      severity: "error",
+      summary: "同步發生錯誤",
+      detail: String(e),
+      life: 3000,
+    });
+  }
+}
 
 async function removeInvestment() {
   confirm.require({
@@ -408,6 +515,16 @@ onMounted(() => {
               class="!px-3 font-bold text-[var(--text-main)]"
             />
             <Button
+              label="同步"
+              icon="pi pi-cloud-upload"
+              text
+              rounded
+              size="small"
+              severity="secondary"
+              @click="openSync"
+              class="!px-3 font-bold text-[var(--text-main)]"
+            />
+            <Button
               label="新增"
               icon="pi pi-plus"
               rounded
@@ -511,17 +628,19 @@ onMounted(() => {
           >
             <!-- 左側: 名字與單位 -->
             <div class="flex items-center gap-3 min-w-0 mb-3 sm:mb-0">
-              <div
-                class="w-10 h-10 rounded-[12px] flex items-center justify-center text-white text-[16px] font-black shrink-0 shadow-sm bg-blue-600"
-              >
-                {{ h.symbol.charAt(0) }}
-              </div>
               <div class="flex flex-col min-w-0">
-                <span
-                  class="text-[14px] sm:text-[15px] font-bold text-[var(--text-main)] truncate max-w-[150px]"
-                >
-                  {{ h.name || h.symbol }}
-                </span>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <Tag
+                    :value="fmtSymbol(h.symbol)"
+                    severity="secondary"
+                    class="!text-[10px] !py-0.5 !px-1.5 font-mono shrink-0"
+                  />
+                  <span
+                    class="text-[14px] sm:text-[15px] font-bold text-[var(--text-main)] truncate"
+                  >
+                    {{ h.name || h.symbol }}
+                  </span>
+                </div>
                 <span
                   class="text-[11px] sm:text-[13px] text-[var(--text-sub)] font-semibold mt-0.5"
                 >
@@ -598,17 +717,19 @@ onMounted(() => {
           >
             <!-- 左側: 名字與單位 -->
             <div class="flex items-center gap-3 min-w-0 mb-3 sm:mb-0">
-              <div
-                class="w-10 h-10 rounded-[12px] flex items-center justify-center text-white text-[16px] font-black shrink-0 shadow-sm bg-purple-600"
-              >
-                {{ h.symbol.charAt(0) }}
-              </div>
               <div class="flex flex-col min-w-0">
-                <span
-                  class="text-[14px] sm:text-[15px] font-bold text-[var(--text-main)] truncate max-w-[150px]"
-                >
-                  {{ h.name || h.symbol }}
-                </span>
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <Tag
+                    :value="h.symbol"
+                    severity="secondary"
+                    class="!text-[10px] !py-0.5 !px-1.5 font-mono shrink-0"
+                  />
+                  <span
+                    class="text-[14px] sm:text-[15px] font-bold text-[var(--text-main)] truncate"
+                  >
+                    {{ h.name || h.symbol }}
+                  </span>
+                </div>
                 <span
                   class="text-[11px] sm:text-[13px] text-[var(--text-sub)] font-semibold mt-0.5"
                 >
@@ -854,10 +975,19 @@ onMounted(() => {
             <InputNumber
               v-model="editForm.current_price"
               class="w-full"
-              inputClass="w-full !rounded-lg bg-gray-50 text-gray-500 border-gray-200"
+              inputClass="w-full !rounded-lg"
               :minFractionDigits="0"
               :maxFractionDigits="4"
-              disabled
+              @focus="
+                editForm.current_price === 0
+                  ? (editForm.current_price = null as any)
+                  : null
+              "
+              @blur="
+                editForm.current_price === null
+                  ? (editForm.current_price = 0)
+                  : null
+              "
             />
           </div>
           <div class="flex flex-col gap-1.5">
@@ -944,6 +1074,89 @@ onMounted(() => {
             />
             <Button label="儲存" severity="primary" @click="saveInvestment" />
           </div>
+        </div>
+      </template>
+    </Dialog>
+
+    <!-- 同步設定對話框 -->
+    <Dialog
+      v-model:visible="syncVisible"
+      header="同步至本月帳戶"
+      modal
+      :draggable="false"
+      :style="{ width: '90vw', maxWidth: '400px' }"
+    >
+      <div class="flex flex-col gap-4 pt-2">
+        <div>
+          <label class="block text-sm font-bold text-gray-700 mb-2"
+            >同步範圍</label
+          >
+          <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <button
+              v-for="opt in [
+                { label: '全部', value: 'ALL' },
+                { label: '僅台股', value: 'TW' },
+                { label: '僅美股', value: 'US' },
+              ]"
+              :key="opt.value"
+              class="flex-1 py-1.5 text-[13px] font-bold rounded-md transition-all"
+              :class="
+                syncMarket === opt.value
+                  ? 'bg-white text-[var(--primary)] shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              "
+              @click="syncMarket = opt.value as 'ALL' | 'TW' | 'US'"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="syncMarket === 'ALL' || syncMarket === 'TW'"
+          class="flex flex-col gap-2"
+        >
+          <label class="text-sm font-bold text-gray-700"
+            >台股同步目標帳戶 (覆蓋金額:
+            {{ fmtCurrency(twTotalSyncValue, "TWD") }})</label
+          >
+          <Select
+            v-model="syncAccountTW"
+            :options="accountOptionsForSyncTW"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="選擇目標帳戶"
+            class="w-full"
+          />
+        </div>
+
+        <div
+          v-if="syncMarket === 'ALL' || syncMarket === 'US'"
+          class="flex flex-col gap-2"
+        >
+          <label class="text-sm font-bold text-gray-700"
+            >美股同步目標帳戶 (覆蓋金額:
+            {{ fmtCurrency(usTotalSyncValue, "USD") }})</label
+          >
+          <Select
+            v-model="syncAccountUS"
+            :options="accountOptionsForSyncUS"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="選擇目標帳戶"
+            class="w-full"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <Button
+            label="取消"
+            severity="secondary"
+            text
+            @click="syncVisible = false"
+          />
+          <Button label="確認同步" severity="primary" @click="confirmSync" />
         </div>
       </template>
     </Dialog>
