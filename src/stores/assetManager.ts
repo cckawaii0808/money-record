@@ -14,7 +14,8 @@ import {
   timestampToMonth
 } from "../utils/monthUtils";
 import { resolveBankIcon } from "../features/asset-manager/utils/bankIcons";
-import { supabase, isMockMode } from "../supabase";
+import { db, auth, isMockMode } from "../firebase";
+import { collection, doc, query, orderBy, where, getDocs, setDoc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
 import { seedAccounts, seedRecords, seedInvestments } from "../data";
 import axios from "axios";
 
@@ -278,7 +279,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     return account.name;
   }
 
-  /** 從 Supabase 讀取帳戶列表 */
+  /** 從 Firebase 讀取帳戶列表 */
   async function fetchAccounts() {
     if (isMockMode) {
       accounts.value = seedAccounts;
@@ -289,69 +290,64 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from("accounts")
-      .select("*")
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true }); // 次要排序
+    const user = auth?.currentUser;
+    if (!user || !db) return;
+    try {
+      const q = query(collection(db, "accounts"), where("user_id", "==", user.uid), orderBy("sort_order", "asc"), orderBy("created_at", "asc"));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => doc.data() as Account);
 
-    if (error) {
-      console.error("Error fetching accounts:", error);
-      return;
-    }
-
-    if (data) {
-      accounts.value = data as Account[];
+      accounts.value = data;
       // 更新選取的帳戶列表，預設全選
       if (selectedAccountIds.value.length === 0) {
         selectedAccountIds.value = accounts.value.map(a => a.id);
       }
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
     }
   }
 
-  /** 從 Supabase 讀取每月紀錄 */
+  /** 從 Firebase 讀取每月紀錄 */
   async function fetchRecords() {
     if (isMockMode) {
       records.value = seedRecords;
       return;
     }
 
-    const { data, error } = await supabase
-      .from("monthly_records")
-      .select("account_id, month, amount");
+    const user = auth?.currentUser;
+    if (!user || !db) return;
+    try {
+      const q = query(collection(db, "monthly_records"), where("user_id", "==", user.uid));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => doc.data());
 
-    if (error) {
-      console.error("Error fetching records:", error);
-      return;
-    }
-
-    if (data) {
       // 轉換欄位名稱 (snake_case -> camelCase) 以符合前端型別
       records.value = data.map((item: any) => ({
         accountId: item.account_id,
         month: item.month,
         amount: Number(item.amount)
       }));
+    } catch (error) {
+      console.error("Error fetching records:", error);
     }
   }
 
-  /** 從 Supabase 讀取投資部位 */
+  /** 從 Firebase 讀取投資部位 */
   async function fetchHoldings() {
     if (isMockMode) {
       holdings.value = seedInvestments.map(h => ({ ...h }));
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    const user = auth?.currentUser;
+    if (!user || !db) return;
 
-    const { data, error } = await supabase
-      .from("holdings")
-      .select("*")
-      .order("sort_order");
+    try {
+      const q = query(collection(db, "holdings"), where("user_id", "==", user.uid), orderBy("sort_order", "asc"));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => doc.data());
 
-    if (!error && data) {
-      holdings.value = (data as any[]).map(row => ({
+      holdings.value = data.map(row => ({
         id: row.id,
         symbol: row.symbol,
         market: row.market,
@@ -362,6 +358,8 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
         current_price: row.current_price,
         currency: row.currency,
       }));
+    } catch (error) {
+       console.error("Error fetching holdings:", error);
     }
   }
 
@@ -372,13 +370,14 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       return { type: "success", message: "已新增部位。" };
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { type: "error", message: "請先登入。" };
+    const user = auth?.currentUser;
+    if (!user || !db) return { type: "error", message: "請先登入。" };
 
-    const { data, error } = await supabase
-      .from("holdings")
-      .insert({
-        user_id: user.id,
+    try {
+      const newDocRef = doc(collection(db, "holdings"));
+      const docData = {
+        id: newDocRef.id,
+        user_id: user.uid,
         symbol: payload.symbol,
         market: payload.market,
         name: payload.name,
@@ -387,25 +386,26 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
         cost_basis: payload.cost_basis ?? 0,
         current_price: payload.current_price,
         currency: payload.currency,
-      })
-      .select()
-      .single();
+        sort_order: holdings.value.length
+      };
 
-    if (error || !data) return { type: "error", message: `新增失敗: ${error?.message}` };
+      await setDoc(newDocRef, docData);
 
-    const row = data as any;
-    holdings.value.push({
-      id: row.id,
-      symbol: row.symbol,
-      market: row.market,
-      name: row.name,
-      shares: row.shares,
-      loaned_shares: row.loaned_shares,
-      cost_basis: row.cost_basis,
-      current_price: row.current_price,
-      currency: row.currency,
-    });
-    return { type: "success", message: "已新增部位。" };
+      holdings.value.push({
+        id: docData.id,
+        symbol: docData.symbol,
+        market: docData.market,
+        name: docData.name,
+        shares: docData.shares,
+        loaned_shares: docData.loaned_shares,
+        cost_basis: docData.cost_basis,
+        current_price: docData.current_price,
+        currency: docData.currency,
+      });
+      return { type: "success", message: "已新增部位。" };
+    } catch (error: any) {
+      return { type: "error", message: `新增失敗: ${error.message}` };
+    }
   }
 
   /** 更新投資部位 */
@@ -416,16 +416,16 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       return { type: "success", message: "已更新部位。" };
     }
 
-    const { error } = await supabase
-      .from("holdings")
-      .update(updates)
-      .eq("id", id);
+    if (!db) return { type: "error", message: "尚未連線資料庫" };
 
-    if (error) return { type: "error", message: `更新失敗: ${error.message}` };
-
-    const idx = holdings.value.findIndex(h => h.id === id);
-    if (idx !== -1) holdings.value[idx] = { ...holdings.value[idx], ...updates };
-    return { type: "success", message: "已更新部位。" };
+    try {
+      await updateDoc(doc(db, "holdings", id), updates as any);
+      const idx = holdings.value.findIndex(h => h.id === id);
+      if (idx !== -1) holdings.value[idx] = { ...holdings.value[idx], ...updates };
+      return { type: "success", message: "已更新部位。" };
+    } catch (error: any) {
+      return { type: "error", message: `更新失敗: ${error.message}` };
+    }
   }
 
   /** 刪除投資部位 */
@@ -435,15 +435,15 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       return { type: "success", message: "已刪除部位。" };
     }
 
-    const { error } = await supabase
-      .from("holdings")
-      .delete()
-      .eq("id", id);
+    if (!db) return { type: "error", message: "尚未連線資料庫" };
 
-    if (error) return { type: "error", message: `刪除失敗: ${error.message}` };
-
-    holdings.value = holdings.value.filter(h => h.id !== id);
-    return { type: "success", message: "已刪除部位。" };
+    try {
+      await deleteDoc(doc(db, "holdings", id));
+      holdings.value = holdings.value.filter(h => h.id !== id);
+      return { type: "success", message: "已刪除部位。" };
+    } catch (error: any) {
+      return { type: "error", message: `刪除失敗: ${error.message}` };
+    }
   }
 
   /** 批次更新報價快取（更新本地狀態，並非同步寫回 DB） */
@@ -455,17 +455,14 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     });
 
     // 非同步寫回 DB（fire-and-forget，不阻塞 UI）
-    if (!isMockMode) {
-      void Promise.all(
-        holdings.value
-          .filter(h => prices[h.symbol] !== undefined)
-          .map(h =>
-            supabase
-              .from("holdings")
-              .update({ current_price: prices[h.symbol] })
-              .eq("id", h.id)
-          )
-      );
+    if (!isMockMode && db) {
+      const batch = writeBatch(db);
+      holdings.value
+        .filter(h => prices[h.symbol] !== undefined)
+        .forEach(h => {
+          batch.update(doc(db!, "holdings", h.id), { current_price: prices[h.symbol] });
+        });
+      void batch.commit().catch(e => console.error("Batch update failed:", e));
     }
   }
 
@@ -740,15 +737,14 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     return output;
   });
 
-  /** 新增帳戶到 Supabase */
+  /** 新增帳戶到 Firebase */
   async function addAccount(): Promise<ActionResult> {
     if (!newAccount.value.name.trim()) {
       return { type: "error", message: "請先填入帳戶名稱。" };
     }
     
-    // 取得目前的使用者 ID
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const user = auth?.currentUser;
+    if (!user || !db) {
        return { type: "error", message: "請先登入才能新增帳戶。" };
     }
 
@@ -757,41 +753,39 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       ? Math.max(...accounts.value.map(a => a.sort_order || 0)) 
       : 0;
 
-    const payload = {
-      user_id: user.id,
-      name: newAccount.value.name.trim(),
-      category: newAccount.value.category.trim() || "未分類",
-      currency: newAccount.value.currency,
-      type: newAccount.value.type,
-      sort_order: maxSortOrder + 1
-    };
+    try {
+      const newDocRef = doc(collection(db, "accounts"));
+      const payload: any = {
+        id: newDocRef.id,
+        user_id: user.uid,
+        name: newAccount.value.name.trim(),
+        category: newAccount.value.category.trim() || "未分類",
+        currency: newAccount.value.currency,
+        type: newAccount.value.type,
+        sort_order: maxSortOrder + 1,
+        created_at: new Date().toISOString()
+      };
 
-    const { data, error } = await supabase
-      .from("accounts")
-      .insert(payload)
-      .select()
-      .single();
+      await setDoc(newDocRef, payload);
+      
+      // 更新本地狀態
+      accounts.value.push(payload as Account);
+      selectedAccountIds.value = [...selectedAccountIds.value, payload.id];
 
-    if (error || !data) {
-      return { type: "error", message: `新增失敗: ${error?.message}` };
+      // 重置表單
+      newAccount.value = {
+        name: "",
+        category: "",
+        type: "asset",
+        currency: "TWD"
+      };
+      return { type: "success", message: `已新增帳戶：${payload.name}` };
+    } catch (error: any) {
+      return { type: "error", message: `新增失敗: ${error.message}` };
     }
-    
-    // 更新本地狀態
-    const newAcc = data as Account;
-    accounts.value.push(newAcc);
-    selectedAccountIds.value = [...selectedAccountIds.value, newAcc.id];
-
-    // 重置表單
-    newAccount.value = {
-      name: "",
-      category: "",
-      type: "asset",
-      currency: "TWD"
-    };
-    return { type: "success", message: `已新增帳戶：${newAcc.name}` };
   }
 
-  /** 批次儲存/更新每月紀錄到 Supabase */
+  /** 批次儲存/更新每月紀錄到 Firebase */
   async function bulkUpsertMonthlyRecords(
     month: string,
     entries: Array<{
@@ -807,32 +801,34 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       return { type: "error", message: "目前沒有可儲存的帳戶資料。" };
     }
     
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const user = auth?.currentUser;
+    if (!user || !db) {
        return { type: "error", message: "請先登入。" };
     }
 
-    // 準備 Upsert 資料
-    const upsertData = entries.map(entry => ({
-      user_id: user.id,
-      account_id: entry.accountId,
-      month: month,
-      amount: Math.max(0, entry.amount)
-    }));
+    try {
+      const batch = writeBatch(db);
+      entries.forEach(entry => {
+        const docId = `${entry.accountId}_${month}`;
+        const data = {
+          user_id: user.uid,
+          account_id: entry.accountId,
+          month: month,
+          amount: Math.max(0, entry.amount)
+        };
+        batch.set(doc(db!, "monthly_records", docId), data, { merge: true });
+      });
 
-    const { error } = await supabase
-      .from("monthly_records")
-      .upsert(upsertData, { onConflict: "account_id, month" });
+      await batch.commit();
 
-    if (error) {
+      // 重新讀取資料以同步本地狀態 (最保險的做法)
+      await fetchRecords();
+
+      selectedMonth.value = clampMonth(month);
+      return { type: "success", message: `已儲存 ${month} 的資料。` };
+    } catch (error: any) {
       return { type: "error", message: `儲存失敗: ${error.message}` };
     }
-
-    // 重新讀取資料以同步本地狀態 (最保險的做法)
-    await fetchRecords();
-
-    selectedMonth.value = clampMonth(month);
-    return { type: "success", message: `已儲存 ${month} 的資料。` };
   }
 
   function selectAllAccounts(): void {
@@ -845,37 +841,35 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     selectedMonth.value = latest;
   }
 
-  /** 更新帳戶資訊到 Supabase */
+  /** 更新帳戶資訊到 Firebase */
   async function updateAccountById(accountId: string, updates: Partial<Pick<Account, "name" | "category" | "currency">>): Promise<ActionResult> {
     const account = accounts.value.find((item) => item.id === accountId);
     if (!account) {
       return { type: "error", message: "找不到帳戶。" };
     }
+    if (!db) return { type: "error", message: "尚未連線資料庫。" };
 
     const payload: any = {};
     if (updates.name !== undefined) payload.name = updates.name.trim();
     if (updates.category !== undefined) payload.category = updates.category.trim();
     if (updates.currency !== undefined) payload.currency = updates.currency;
 
-    const { error } = await supabase
-      .from("accounts")
-      .update(payload)
-      .eq("id", accountId);
+    try {
+      await updateDoc(doc(db, "accounts", accountId), payload);
 
-    if (error) {
+      // 更新本地狀態
+      const index = accounts.value.findIndex((item) => item.id === accountId);
+      if (index >= 0) {
+        accounts.value[index] = { ...accounts.value[index], ...payload };
+      }
+      
+      return { type: "success", message: `已更新帳戶：${payload.name ?? account.name}` };
+    } catch (error: any) {
       return { type: "error", message: `更新失敗: ${error.message}` };
     }
-
-    // 更新本地狀態
-    const index = accounts.value.findIndex((item) => item.id === accountId);
-    if (index >= 0) {
-      accounts.value[index] = { ...accounts.value[index], ...payload };
-    }
-    
-    return { type: "success", message: `已更新帳戶：${payload.name ?? account.name}` };
   }
 
-  /** 更新帳戶資訊到 Supabase（接受完整帳戶物件，失敗時拋出例外） */
+  /** 更新帳戶資訊到 Firebase（接受完整帳戶物件，失敗時拋出例外） */
   async function updateAccount(account: Account): Promise<void> {
     const result = await updateAccountById(account.id, {
       name: account.name,
@@ -887,7 +881,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
   }
 
-  /** 更新帳戶排序到 Supabase */
+  /** 更新帳戶排序到 Firebase */
   async function reorderAccount(fromIndex: number, toIndex: number): Promise<ActionResult> {
     const list = [...accounts.value]; // 複製一份
     if (
@@ -903,23 +897,15 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     list.splice(toIndex, 0, moved);
     accounts.value = list;
 
-    // 準備批次更新資料
-    // 我們重新計算所有受影響帳戶的 sort_order
-    const updates = list.map((acc, index) => ({
-      id: acc.id,
-      sort_order: index
-    }));
+    if (!db) return { type: "error", message: "尚未連線資料庫" };
 
+    // 準備批次更新資料
     try {
-      // 使用 Promise.all 平行處理所有更新請求，提升效能
-      await Promise.all(
-        updates.map(update => 
-          supabase
-            .from("accounts")
-            .update({ sort_order: update.sort_order })
-            .eq("id", update.id)
-        )
-      );
+      const batch = writeBatch(db);
+      list.forEach((acc, index) => {
+         batch.update(doc(db!, "accounts", acc.id), { sort_order: index });
+      });
+      await batch.commit();
       return { type: "success", message: "排序已更新" };
     } catch (err) {
       console.error("Sorting error:", err);
@@ -934,33 +920,31 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     if (!account) {
       return { type: "error", message: "找不到要刪除的帳戶。" };
     }
+    if (!db) return { type: "error", message: "尚未連線資料庫。" };
 
-    // 先刪除關聯的 monthly_records
-    const { error: recordError } = await supabase
-      .from("monthly_records")
-      .delete()
-      .eq("account_id", accountId);
+    try {
+      const batch = writeBatch(db);
+      
+      // 先查詢並刪除關聯的 monthly_records
+      const q = query(collection(db, "monthly_records"), where("account_id", "==", accountId));
+      const snapshot = await getDocs(q);
+      snapshot.docs.forEach(d => {
+         batch.delete(d.ref);
+      });
 
-    if (recordError) {
-      return { type: "error", message: `刪除關聯紀錄失敗: ${recordError.message}` };
+      // 再刪除 accounts
+      batch.delete(doc(db, "accounts", accountId));
+      await batch.commit();
+
+      // 更新本地狀態
+      accounts.value = accounts.value.filter((item) => item.id !== accountId);
+      selectedAccountIds.value = selectedAccountIds.value.filter((id) => id !== accountId);
+      records.value = records.value.filter((r) => r.accountId !== accountId);
+
+      return { type: "success", message: `已刪除帳戶：${account.name}` };
+    } catch (error: any) {
+      return { type: "error", message: `刪除帳戶失敗: ${error.message}` };
     }
-
-    // 再刪除 accounts
-    const { error: accountError } = await supabase
-      .from("accounts")
-      .delete()
-      .eq("id", accountId);
-
-    if (accountError) {
-      return { type: "error", message: `刪除帳戶失敗: ${accountError.message}` };
-    }
-
-    // 更新本地狀態
-    accounts.value = accounts.value.filter((item) => item.id !== accountId);
-    selectedAccountIds.value = selectedAccountIds.value.filter((id) => id !== accountId);
-    records.value = records.value.filter((r) => r.accountId !== accountId);
-
-    return { type: "success", message: `已刪除帳戶：${account.name}` };
   }
 
   // 自動初始化資料

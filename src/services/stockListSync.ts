@@ -3,7 +3,7 @@
  *
  * 台股清單資料流：
  *   1. 模組載入時立即從 tw_stocks.json 同步初始化記憶體快取（零延遲）
- *   2. initStockCache() 可在背景嘗試升級為 Supabase 資料（正式資料來源）
+ *   2. initStockCache() 可在背景嘗試升級為 Firebase 資料（正式資料來源）
  *
  * Mock 資料來源：src/data/tw_stocks.json
  *   原始資料來自臺灣證券交易所 OpenAPI：
@@ -16,7 +16,8 @@
  *     -OutFile "src/data/tw_stocks.json"
  */
 
-import { supabase } from "../supabase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../firebase";
 import rawStocks from "../data/tw_stocks.json";
 
 // ── 型別 ──────────────────────────────────────────────────────────────────
@@ -69,7 +70,7 @@ function parseMockStocks(): StockRecord[] {
 /**
  * 目前使用中的股票清單。
  * 模組載入時立即用 JSON mock 資料填充，搜尋功能無需等待任何 async 操作。
- * initStockCache() 成功後會替換為 Supabase 資料。
+ * initStockCache() 成功後會替換為 Firebase 資料。
  */
 let _activeStocks: StockRecord[] = parseMockStocks();
 
@@ -80,32 +81,31 @@ export function getActiveStocks(): StockRecord[] {
   return _activeStocks;
 }
 
-// ── 升級至 Supabase ───────────────────────────────────────────────────────
+// ── 升級至 Firebase ───────────────────────────────────────────────────────
 
 /**
- * 嘗試從 Supabase stocks 資料表載入股票清單，覆蓋記憶體快取。
- * 若 Supabase 無資料或失敗，保留 mock JSON 快取，靜默跳過。
+ * 嘗試從 Firebase stocks 集合載入股票清單，覆蓋記憶體快取。
+ * 若 Firebase 無資料或失敗，保留 mock JSON 快取，靜默跳過。
  *
  * 頁面 onMounted 時在背景呼叫，不阻塞搜尋功能。
  */
-export async function initStockCache(): Promise<{ source: "supabase" | "mock"; count: number }> {
+export async function initStockCache(): Promise<{ source: "firebase" | "mock"; count: number }> {
   try {
-    const { data, error } = await supabase
-      .from("stocks")
-      .select("symbol, code, name, market, exch")
-      .eq("market", "TW");
+    if (!db) {
+       return { source: "mock", count: _activeStocks.length };
+    }
+    const q = query(collection(db, "stocks"), where("market", "==", "TW"));
+    const querySnapshot = await getDocs(q);
+    const data = querySnapshot.docs.map(doc => doc.data() as StockRecord);
 
-    if (!error && data && data.length > 0) {
-      _activeStocks = data as StockRecord[];
-      console.log(`[stockListSync] 升級為 Supabase 資料：${data.length} 筆`);
-      return { source: "supabase", count: data.length };
+    if (data.length > 0) {
+      _activeStocks = data;
+      console.log(`[stockListSync] 升級為 Firebase 資料：${data.length} 筆`);
+      return { source: "firebase", count: data.length };
     }
 
-    if (error) {
-      console.warn("[stockListSync] Supabase 讀取失敗，保留 mock:", error.message);
-    }
-  } catch (e) {
-    console.warn("[stockListSync] Supabase 連線異常，保留 mock:", e);
+  } catch (e: any) {
+    console.warn(`[stockListSync] Firebase 讀取失敗，保留 mock: ${e.message}`);
   }
 
   // 保留 mock JSON 快取

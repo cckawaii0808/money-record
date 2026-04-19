@@ -9,3 +9,4 @@ dist-ssr
 .vscode
 .claude
 .codex
+firebase-service-account.json

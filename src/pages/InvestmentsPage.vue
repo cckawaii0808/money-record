@@ -462,7 +462,7 @@ async function onSymbolSelect(event: any) {
 onMounted(() => {
   refreshPrices();
 
-  // 背景嘗試升級至 Supabase 資料（不阻塞頁面，搜尋功能即時可用）
+  // 背景嘗試升級至 Firebase 資料（不阻塞頁面，搜尋功能即時可用）
   initStockCache();
 });
 </script>

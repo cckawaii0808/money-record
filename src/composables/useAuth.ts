@@ -1,9 +1,9 @@
 import { ref } from "vue";
-import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
-import { supabase } from "../supabase";
+import type { User } from "firebase/auth";
+import { auth, googleProvider, onAuthStateChanged, signInWithPopup, signOut } from "../firebase";
 
 const user = ref<User | null>(null);
-let _authSub: ReturnType<typeof supabase.auth.onAuthStateChange> | null = null;
+let _authSub: ReturnType<typeof onAuthStateChanged> | null = null;
 
 export function useAuth() {
   /**
@@ -11,32 +11,29 @@ export function useAuth() {
    * 在 App.vue 的 onMounted 呼叫一次即可
    */
   async function initAuth() {
-    // 1. 先取得當前的 Session
-    const { data } = await supabase.auth.getSession();
-    user.value = data.session?.user ?? null;
+    if (!auth) return;
 
-    // 2. 清除舊的監聽器再重新訂閱，避免 HMR 或重複呼叫導致多重觸發
-    _authSub?.data.subscription.unsubscribe();
-    _authSub = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      user.value = session?.user ?? null;
+    // 清除舊的監聽器再重新訂閱，避免多次觸發
+    if (_authSub) {
+      _authSub(); // Firebase 的 return function 即是 unsubscribe
+    }
+    
+    _authSub = onAuthStateChanged(auth, (currentUser) => {
+      user.value = currentUser;
     });
   }
 
   /**
    * Google 登入
-   * 會導向到 Google 登入頁面，登入成功後會跳轉回來
    */
   async function loginWithGoogle() {
-    // 自動根據當前環境生成跳轉路徑 (本地 dev 為 localhost, 正式為 github.io)
-    const redirectUrl = window.location.origin + import.meta.env.BASE_URL;
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: redirectUrl
-      }
-    });
-    if (error) {
+    if (!auth || !googleProvider) {
+       console.error("Firebase Auth 未初始化");
+       return;
+    }
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
       console.error("Google login error:", error.message);
       throw error;
     }
@@ -46,12 +43,12 @@ export function useAuth() {
    * 登出
    */
   async function logout() {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    if (!auth) return;
+    try {
+      await signOut(auth);
+    } catch (error: any) {
       console.error("Logout error:", error.message);
     }
-    // 登出後 user.value 會由 onAuthStateChange 自動更新為 null
-    // 可以在這裡強制跳轉回首頁，或由 Router Guard 處理
   }
 
   return {

@@ -3,7 +3,7 @@
  *
  * 台股搜尋：從記憶體快取（getActiveStocks）做客戶端模糊過濾。
  * 快取來源由 stockListSync 模組載入時同步初始化（tw_stocks.json），
- * 或 initStockCache() 升級為 Supabase 資料後替換。
+ * 或 initStockCache() 升級為 Firebase 資料後替換。
  */
 
 import { getActiveStocks } from "./stockListSync";
