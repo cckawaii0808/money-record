@@ -33,7 +33,7 @@ export const mockAuth = {
 };
 
 // Re-export Firebase Auth functions for use in composables
-export { onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
+export { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 
 if (!isMockMode && !isConfigComplete) {
   console.error("Firebase API Key or Project ID is missing. Please check your .env file.");

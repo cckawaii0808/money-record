@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import type { User } from "firebase/auth";
-import { auth, googleProvider, onAuthStateChanged, signInWithRedirect, signOut } from "../firebase";
+import { auth, googleProvider, onAuthStateChanged, signInWithPopup, signOut } from "../firebase";
 
 const user = ref<User | null>(null);
 let _authSub: ReturnType<typeof onAuthStateChanged> | null = null;
@@ -9,7 +9,6 @@ export function useAuth() {
   /**
    * 初始化 Auth 狀態監聽器
    * 在 App.vue 的 onMounted 呼叫一次即可
-   * 注意：getRedirectResult 已移至 main.ts 在掛載前執行，避免時序競爭
    */
   function initAuth() {
     if (!auth) return;
@@ -24,7 +23,9 @@ export function useAuth() {
   }
 
   /**
-   * Google 登入（redirect 模式，相容 GitHub Pages）
+   * Google 登入（popup 模式）
+   * GitHub Pages 不設定 COOP 標頭，popup 可正常運作
+   * signInWithRedirect 在 authDomain ≠ hosting domain 時無法取得結果
    */
   async function loginWithGoogle() {
     if (!auth || !googleProvider) {
@@ -32,7 +33,7 @@ export function useAuth() {
        return;
     }
     try {
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       console.error("Google login error:", error.message);
       throw error;

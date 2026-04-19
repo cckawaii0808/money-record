@@ -6,8 +6,6 @@ import PrimeVue from "primevue/config";
 import Aura from "@primevue/themes/aura";
 import ToastService from "primevue/toastservice";
 import ConfirmationService from "primevue/confirmationservice";
-import { auth } from "./firebase";
-import { getRedirectResult } from "firebase/auth";
 
 // Tailwind CSS v4 + PrimeUI plugin（優先載入）
 import "./styles/tailwind.css";
@@ -35,19 +33,6 @@ app
     }
   })
   .use(ToastService)
-  .use(ConfirmationService);
+  .use(ConfirmationService)
 
-// 在掛載前先處理 OAuth redirect 結果，確保 auth.currentUser 已就緒
-// 避免 Router 守衛在 getRedirectResult 之前執行而誤判為未登入
-async function bootstrap() {
-  if (auth) {
-    try {
-      await getRedirectResult(auth);
-    } catch (e: any) {
-      console.error("Redirect result error:", e.code, e.message);
-    }
-  }
-  app.mount("#app");
-}
-
-bootstrap();
+app.mount("#app");
