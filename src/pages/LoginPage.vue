@@ -3,12 +3,18 @@
  * LoginPage — 登入頁面
  * 使用原生 scoped CSS 確保樣式在生產環境正確套用，避免 Tailwind arbitrary values 可能的問題
  */
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useAuth } from "../composables/useAuth";
 
-const { loginWithGoogle } = useAuth();
+const router = useRouter();
+const { loginWithGoogle, user } = useAuth();
 const loading = ref(false);
 const errorMsg = ref("");
+
+watch(user, (newUser) => {
+  if (newUser) router.push("/dashboard");
+});
 
 async function handleLogin() {
   /* 防止重複點擊 */
