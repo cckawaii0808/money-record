@@ -20,19 +20,10 @@ onMounted(() => {
 
 // ── 使用者資訊 ────────────────────────────────────────────────────────────
 
-const avatarUrl = computed(
-  () =>
-    user.value?.user_metadata?.avatar_url ||
-    user.value?.user_metadata?.picture ||
-    null,
-);
+const avatarUrl = computed(() => user.value?.photoURL || null);
 
 const displayName = computed(
-  () =>
-    user.value?.user_metadata?.full_name ||
-    user.value?.user_metadata?.name ||
-    user.value?.email ||
-    "",
+  () => user.value?.displayName || user.value?.email || "",
 );
 
 // ── 導覽控制 ──────────────────────────────────────────────────────────────
