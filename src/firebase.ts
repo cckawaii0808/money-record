@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 import { getFirestore, collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy } from "firebase/firestore";
 
 export const isMockMode = import.meta.env.VITE_USE_MOCK_DATA === 'true';
@@ -33,7 +33,7 @@ export const mockAuth = {
 };
 
 // Re-export Firebase Auth functions for use in composables
-export { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+export { onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 
 if (!isMockMode && !isConfigComplete) {
   console.error("Firebase API Key or Project ID is missing. Please check your .env file.");

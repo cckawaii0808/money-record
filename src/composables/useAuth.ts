@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import type { User } from "firebase/auth";
-import { auth, googleProvider, onAuthStateChanged, signInWithPopup, signOut } from "../firebase";
+import { auth, googleProvider, onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut } from "../firebase";
 
 const user = ref<User | null>(null);
 let _authSub: ReturnType<typeof onAuthStateChanged> | null = null;
@@ -15,16 +15,23 @@ export function useAuth() {
 
     // 清除舊的監聽器再重新訂閱，避免多次觸發
     if (_authSub) {
-      _authSub(); // Firebase 的 return function 即是 unsubscribe
+      _authSub();
     }
-    
+
+    // 處理 redirect 登入後的回調結果
+    try {
+      await getRedirectResult(auth);
+    } catch (error: any) {
+      console.error("Redirect result error:", error.message);
+    }
+
     _authSub = onAuthStateChanged(auth, (currentUser) => {
       user.value = currentUser;
     });
   }
 
   /**
-   * Google 登入
+   * Google 登入（redirect 模式，相容 GitHub Pages）
    */
   async function loginWithGoogle() {
     if (!auth || !googleProvider) {
@@ -32,7 +39,7 @@ export function useAuth() {
        return;
     }
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
       console.error("Google login error:", error.message);
       throw error;
