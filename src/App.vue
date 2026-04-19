@@ -8,6 +8,7 @@ import Toast from "primevue/toast";
 import ConfirmDialog from "primevue/confirmdialog";
 import Popover from "primevue/popover";
 import { useAuth } from "./composables/useAuth";
+import AiAssistant from "./components/AiAssistant.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -276,6 +277,9 @@ function isActive(path: string) {
           <router-view />
         </main>
       </div>
+
+      <!-- ── AI 助手（浮動） ─────────────────────────────────────────────── -->
+      <AiAssistant />
 
       <!-- ── 手機底部導覽列 ──────────────────────────────────────────────── -->
       <nav
