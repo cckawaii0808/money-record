@@ -1,191 +1,159 @@
-import axios from "axios";
+/**
+ * 股票搜尋與報價服務。
+ *
+ * 架構說明：
+ * - 台股搜尋：使用本地 tw_stocks.json（快速、不消耗 API quota）
+ * - 美股搜尋：透過 Worker 代理 Finnhub（金鑰在後端，不暴露給瀏覽器）
+ * - 所有股價取得：透過 Worker 代理（Fugle 台股 / Finnhub 美股）
+ */
+
+import { apiGet } from "./apiClient";
 import twStocksData from "../data/tw_stocks.json";
 
-// Finnhub API Key 設定
-const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY;
+// ============================================================================
+// 型別定義
+// ============================================================================
 
+interface WorkerSearchResult {
+  data: Array<{
+    symbol: string;
+    name: string;
+    market: "TW" | "US";
+    type: string;
+  }>;
+  meta: {
+    query: string;
+    market: string;
+    count: number;
+  };
+  errors: string[];
+}
+
+interface WorkerSyncResult {
+  data: Array<{
+    symbol: string;
+    market: "TW" | "US";
+    price: number;
+    updatedAt: number;
+    source: string;
+  }>;
+  meta: {
+    requestedCount: number;
+    cacheHitCount: number;
+    fetchedCount: number;
+    ttlMs: number;
+  };
+  errors: string[];
+}
+
+// ============================================================================
+// 股票搜尋
+// ============================================================================
+
+/**
+ * 搜尋股票標的。
+ *
+ * - 台股：從本地 tw_stocks.json 過濾（快速、不消耗 API）
+ * - 美股：呼叫 Worker API（Finnhub 金鑰在後端）
+ *
+ * @param query - 搜尋關鍵字（代碼或名稱）
+ * @param market - 市場（"TW" | "US"），未指定時同時搜尋
+ */
 export async function searchStocks(query: string, market?: string) {
   if (!query || query.trim().length < 1) return [];
 
   const q = query.trim();
 
-  // 1. 若為美股 (US)，打 Finnhub API
+  // 美股：透過 Worker 搜尋
   if (market === "US") {
-    const finnhubUrl = `https://finnhub.io/api/v1/search?q=${encodeURIComponent(q)}&token=${FINNHUB_API_KEY}`;
     try {
-      const res = await axios.get(finnhubUrl, { timeout: 10000 });
-      if (res.data && res.data.result) {
-        return res.data.result
-          // Finnhub 回傳有 Common Stock, ETF, ETP 等，我們過濾掉無用的
-          .filter((item: any) => !item.type || item.type === "Common Stock" || item.type.includes("ETF") || item.type.includes("ETP"))
-          .map((item: any) => ({
-            symbol: item.symbol,
-            code: item.symbol,
-            name: item.description,
-            exch: item.type || "US"
-          }));
-      }
-      return [];
+      const result = await apiGet<WorkerSearchResult>(
+        `/api/stocks/search?q=${encodeURIComponent(q)}&market=US`
+      );
+      return result.data.map((item) => ({
+        symbol: item.symbol,
+        code: item.symbol,
+        name: item.name,
+        exch: "US"
+      }));
     } catch (error) {
-      console.error("[stockApi] Finnhub search error:", error);
+      console.error("[stockApi] Worker 美股搜尋失敗：", error);
       return [];
     }
   }
 
-  // 2. 若為台股 (TW) 或未指定，全本地搜尋 tw_stocks.json (免 API 最穩定)
+  // 台股：本地 JSON 過濾（最快，不需要 API）
+  // tw_stocks.json 的欄位格式：{ Date, Code, Name }
   const lowerQ = q.toLowerCase();
-  
-  // 從本地 JSON 直接過濾 (最多取 30 筆)
-  const results = (twStocksData as any[])
-    .filter(item => 
-      (item.symbol && item.symbol.toLowerCase().includes(lowerQ)) || 
-      (item.name && item.name.toLowerCase().includes(lowerQ))
+  return (twStocksData as Array<{ Code: string; Name: string }>)
+    .filter(
+      (item) =>
+        (item.Code && item.Code.toLowerCase().includes(lowerQ)) ||
+        (item.Name && item.Name.toLowerCase().includes(lowerQ))
     )
     .slice(0, 30)
-    .map(item => ({
-      symbol: item.symbol,
-      code: item.symbol,
-      name: item.name,
-      exch: item.market || "TW"
+    .map((item) => ({
+      symbol: item.Code,
+      code: item.Code,
+      name: item.Name,
+      exch: "TW"
     }));
-
-  return results;
 }
 
-// --- 台灣股市 Open API 快取機制 ---
-let twseCache: Record<string, number> | null = null;
-let twseCacheTime = 0;
-const CACHE_TTL = 1000 * 60 * 60; // 1小時快取
+// ============================================================================
+// 股價取得
+// ============================================================================
 
-async function getTwseData(): Promise<Record<string, number>> {
-  if (twseCache && Date.now() - twseCacheTime < CACHE_TTL) {
-    return twseCache;
-  }
-
-  const priceMap: Record<string, number> = {};
-  try {
-    // 1. 取得證交所 (上市) 每日收盤行情
-    let twseData = null;
-    try {
-      // 透過 allorigins 代理解決 CORS
-      const proxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
-      const twseRes = await axios.get(proxyUrl, { timeout: 10000 });
-      twseData = JSON.parse(twseRes.data.contents);
-    } catch (err) {
-      console.warn("TWSE 抓取失敗：", err);
-    }
-
-    if (Array.isArray(twseData)) {
-      twseData.forEach((item: any) => {
-        if (item.Code && item.ClosingPrice) {
-          const price = parseFloat(item.ClosingPrice);
-          if (!isNaN(price)) {
-            priceMap[`${item.Code}.TW`] = price;
-          }
-        }
-      });
-    }
-
-    // 2. 取得櫃買中心 (上櫃) 每日收盤行情
-    let tpexData = null;
-    try {
-      // 同樣透過 allorigins 代理解決 CORS
-      const tpexProxyUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes');
-      const tpexRes = await axios.get(tpexProxyUrl, { timeout: 10000 });
-      tpexData = JSON.parse(tpexRes.data.contents);
-    } catch (err) {
-      console.warn("TPEx 抓取失敗：", err);
-    }
-
-    if (Array.isArray(tpexData)) {
-      tpexData.forEach((item: any) => {
-        if (item.SecuritiesCompanyCode && item.Close) {
-          const price = parseFloat(item.Close);
-          if (!isNaN(price)) {
-            priceMap[`${item.SecuritiesCompanyCode}.TWO`] = price;
-          }
-        }
-      });
-    }
-
-    twseCache = priceMap;
-    twseCacheTime = Date.now();
-    return priceMap;
-  } catch (error) {
-    console.error("[stockApi] 取得台股 Open API 失敗:", error);
-    if (twseCache) return twseCache;
-    return {};
-  }
-}
-
+/**
+ * 取得單一股票的最新報價。
+ *
+ * 透過 Worker 代理，支援台股（Fugle）與美股（Finnhub）。
+ * Worker 有 5 分鐘快取，不會每次都打外部 API。
+ *
+ * @param symbol - 股票代碼（支援多種格式：2330、TW:2330、NVDA、US:NVDA）
+ */
 export async function fetchStockPrice(symbol: string): Promise<number | null> {
-  let formattedSymbol = symbol.trim().toUpperCase();
-  
-  // 台股自動補上 .TW
-  const isTaiwan = /^\d{4}$/.test(formattedSymbol) || formattedSymbol.endsWith(".TW") || formattedSymbol.endsWith(".TWO");
-  if (/^\d{4}$/.test(formattedSymbol)) {
-    formattedSymbol += ".TW";
-  }
-
-  // 1. 美股即時報價，走 Finnhub API (判斷依據: 沒有點號或是我們明確知道是美股)
-  if (!isTaiwan && !formattedSymbol.includes(".")) {
-    const finnhubUrl = `https://finnhub.io/api/v1/quote?symbol=${formattedSymbol}&token=${FINNHUB_API_KEY}`;
-    try {
-      const res = await axios.get(finnhubUrl, { timeout: 10000 });
-      // Finnhub quote: c is current price
-      if (res.data && res.data.c !== undefined && res.data.c !== 0) {
-        return res.data.c;
-      }
-      return null;
-    } catch (error) {
-      console.error(`[stockApi] Finnhub error fetching price for ${formattedSymbol}:`, error);
-      return null;
-    }
-  }
-
-  // 2. 台股即時報價，走 Open API
-  try {
-    const twseData = await getTwseData();
-    if (twseData[formattedSymbol] !== undefined) {
-      return twseData[formattedSymbol];
-    }
-    
-    // 如果找不到，試試切換 .TW / .TWO 後綴互找
-    const altSymbol = formattedSymbol.endsWith(".TW") 
-      ? formattedSymbol.replace(".TW", ".TWO") 
-      : formattedSymbol.replace(".TWO", ".TW");
-      
-    if (twseData[altSymbol] !== undefined) {
-      return twseData[altSymbol];
-    }
-    
-    return null;
-  } catch (error) {
-    console.error(`[stockApi] TWSE error fetching price for ${formattedSymbol}:`, error);
-    return null;
-  }
+  const prices = await fetchMultipleStockPrices([symbol]);
+  return prices[symbol] ?? null;
 }
 
 /**
- * 批次取得多個股票的價格
+ * 批次取得多支股票的最新報價。
+ *
+ * 透過 Worker 的 /api/stocks/sync 端點，支援混合台股與美股。
+ * Worker 有 5 分鐘快取，對相同標的不會重複打外部 API。
+ *
+ * @param symbols - 股票代碼陣列（支援多種格式混用）
+ * @returns 以代碼為 key 的價格 Map（取得失敗的代碼不會出現在結果中）
  */
-export async function fetchMultipleStockPrices(symbols: string[]): Promise<Record<string, number>> {
-  const priceMap: Record<string, number> = {};
-  
-  // 先嘗試拉一次台股資料 (確保快取準備好，可以加速)
-  const hasTaiwanStocks = symbols.some(s => /^\d{4}$/.test(s) || s.endsWith(".TW") || s.endsWith(".TWO"));
-  if (hasTaiwanStocks) {
-    await getTwseData();
-  }
-  
-  // 避免併發過多被阻擋
-  const promises = symbols.map(async (sym) => {
-    const price = await fetchStockPrice(sym);
-    if (price !== null) {
-      priceMap[sym] = price;
-    }
-  });
+export async function fetchMultipleStockPrices(
+  symbols: string[]
+): Promise<Record<string, number>> {
+  if (symbols.length === 0) return {};
 
-  await Promise.allSettled(promises);
-  return priceMap;
+  const symbolsParam = symbols.join(",");
+
+  try {
+    const result = await apiGet<WorkerSyncResult>(
+      `/api/stocks/sync?symbols=${encodeURIComponent(symbolsParam)}`
+    );
+
+    const priceMap: Record<string, number> = {};
+    for (const item of result.data) {
+      // 回傳的 symbol 格式為原始代碼，嘗試用傳入的格式當 key
+      priceMap[item.symbol] = item.price;
+
+      // 同時用 market:symbol 格式當 key，方便上層使用
+      priceMap[`${item.market}:${item.symbol}`] = item.price;
+    }
+
+    if (result.errors.length > 0) {
+      console.warn("[stockApi] 部分股票取得失敗：", result.errors);
+    }
+
+    return priceMap;
+  } catch (error) {
+    console.error("[stockApi] Worker 報價取得失敗：", error);
+    return {};
+  }
 }
