@@ -11,7 +11,7 @@ import { auth } from "../firebase";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  "https://money-record-api.a23730800.workers.dev";
+  "https://api-money.ccxie.qzz.io";
 
 /**
  * 取得目前登入使用者的 Firebase ID Token。
