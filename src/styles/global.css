@@ -31,9 +31,9 @@ body {
 
 /* Apollo 通用輔助 */
 .page-container {
-  max-width: 1400px; /* Apollo 喜歡利用寬螢幕空間 */
+  max-width: 1400px;
   margin-inline: auto;
-  padding: 32px 32px 80px; /* 大面積留白 */
+  padding: 24px 24px 80px;
 }
 
 /* 數字 tabular(等寬) */
@@ -60,10 +60,10 @@ h1, h2, h3, h4, h5, h6 {
 /* 手機底部導覽留白 (很重要，保持手機操作體驗) */
 @media (max-width: 639px) {
   .page-container {
-    padding-top: 20px;
-    padding-left: 20px;
-    padding-right: 20px;
-    padding-bottom: 100px; /* 為底部導覽留出充足空間 */
+    padding-top: 16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-bottom: 96px;
   }
 }
 
@@ -76,7 +76,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid transparent; 
   border-radius: 1rem; /* Apollo 約 16px 圓角，不像我們之前抓的 24px 那麼巨型 */
   box-shadow: var(--card-shadow);
-  padding: 1.5rem; /* 大 Padding 是關鍵 */
+  padding: 1.25rem; /* 適中的 Padding，避免電腦版看起來過於巨大 */
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -84,3 +84,111 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 10px 25px rgba(0,0,0,0.06), 0 2px 5px rgba(0,0,0,0.04);
   /* 移除預設的大幅度浮起，Apollo UI 更平穩 */
 }
+
+/* --- 精緻極簡 Toast 提示框樣式調整 --- */
+
+/* 1. 限制 Toast 容器寬度自適應，並使其在畫面置中 */
+.p-toast {
+  width: auto !important;
+  max-width: 90vw;
+  min-width: 180px;
+}
+
+/* 2. 重新設計 Toast Message 本體：改為精緻的膠囊(Pill)設計 */
+.p-toast-message {
+  border-radius: 9999px !important; /* 膠囊狀 */
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid var(--line-soft) !important;
+  background: var(--surface) !important;
+  margin-bottom: 8px !important;
+  backdrop-filter: blur(8px);
+}
+
+/* 3. 調整內容區域排版：橫向排列、緊湊 Padding */
+.p-toast-message-content {
+  padding: 0.5rem 1.25rem !important; /* 上下縮減，左右適中 */
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+/* 4. 移除打叉關閉按鈕，避免太佔空間，且因為它會自動消失 */
+.p-toast-message-close-button {
+  display: none !important;
+}
+
+/* 5. 調整文字樣式：標題與詳細資訊排在同一行，或簡潔呈現 */
+.p-toast-message-text {
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.35rem !important;
+}
+
+.p-toast-message-summary {
+  font-size: 0.875rem !important; /* 14px */
+  font-weight: 600 !important;
+  color: var(--text-main) !important;
+  white-space: nowrap !important;
+}
+
+.p-toast-message-detail {
+  font-size: 0.75rem !important; /* 12px */
+  color: var(--text-sub) !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
+.p-toast-message-detail:not(:empty)::before {
+  content: "•";
+  margin-right: 4px;
+  color: var(--text-muted);
+}
+
+/* 6. 不同性質的 Toast 微調背景與文字色，使其低調精緻 */
+/* 成功 (Success) */
+.p-toast-message-success {
+  background: rgba(236, 253, 245, 0.9) !important; /* var(--primary-soft) */
+  border-color: rgba(16, 185, 129, 0.2) !important;
+}
+.p-toast-message-success .p-toast-message-icon {
+  color: var(--positive) !important;
+}
+
+/* 錯誤 (Error) */
+.p-toast-message-error {
+  background: rgba(255, 241, 242, 0.9) !important;
+  border-color: rgba(244, 63, 94, 0.2) !important;
+}
+.p-toast-message-error .p-toast-message-icon {
+  color: var(--negative) !important;
+}
+
+/* 警告 (Warn) */
+.p-toast-message-warn {
+  background: rgba(254, 243, 199, 0.9) !important;
+  border-color: rgba(245, 158, 11, 0.2) !important;
+}
+.p-toast-message-warn .p-toast-message-icon {
+  color: var(--warn) !important;
+}
+
+/* 深色模式下的微調 */
+:root[data-theme="dark"] .p-toast-message {
+  background: var(--surface) !important;
+  border-color: var(--line-soft) !important;
+}
+:root[data-theme="dark"] .p-toast-message-success {
+  background: rgba(6, 78, 59, 0.6) !important;
+  border-color: rgba(52, 211, 153, 0.3) !important;
+}
+:root[data-theme="dark"] .p-toast-message-error {
+  background: rgba(136, 19, 55, 0.6) !important;
+  border-color: rgba(251, 113, 133, 0.3) !important;
+}
+:root[data-theme="dark"] .p-toast-message-warn {
+  background: rgba(120, 53, 4, 0.6) !important;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+}
+

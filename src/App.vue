@@ -83,7 +83,7 @@ function isActive(path: string) {
 
 <template>
   <div class="min-h-[100dvh] bg-[var(--app-bg)]">
-    <Toast position="top-center" />
+    <Toast position="top-center" :pt="{ root: { class: '!mt-4 lg:!mt-24' } }" />
     <ConfirmDialog />
 
     <template v-if="!showNav">

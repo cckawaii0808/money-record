@@ -20,13 +20,16 @@ export interface MonthlyRecord {
 }
 
 export interface Holding {
-  id: string;
+  id: number;
   symbol: string;
-  market: string;
+  market: "TW" | "US";
   name: string;
-  shares: number | null;
-  loaned_shares: number | null;
-  cost_basis: number | null;
-  current_price: number | null;
+  quantity: number;
+  avgCost: number;
   currency: string;
+  currentPrice: number | null;
+  marketValue: number;
+  gainLoss: number;
+  gainLossPct: number | null;
+  updatedAt: string;
 }

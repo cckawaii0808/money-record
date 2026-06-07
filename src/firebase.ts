@@ -1,6 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
-import { getFirestore, collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
 
 export const isMockMode = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
@@ -18,7 +17,6 @@ const isConfigComplete = firebaseConfig.apiKey && firebaseConfig.projectId;
 
 const app = (!isMockMode && isConfigComplete) ? initializeApp(firebaseConfig) : null;
 export const auth = app ? getAuth(app) : null;
-export const db = app ? getFirestore(app) : null;
 export const googleProvider = app ? new GoogleAuthProvider() : null;
 
 // Mock implementations for easy testing without errors

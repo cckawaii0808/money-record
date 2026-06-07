@@ -14,10 +14,25 @@ import {
   timestampToMonth
 } from "../utils/monthUtils";
 import { resolveBankIcon } from "../features/asset-manager/utils/bankIcons";
-import { db, auth, isMockMode } from "../firebase";
-import { collection, doc, query, orderBy, where, getDocs, setDoc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { isMockMode } from "../firebase";
 import { seedAccounts, seedRecords, seedInvestments } from "../data";
 import axios from "axios";
+import {
+  getHoldings as apiGetHoldings,
+  createHolding as apiCreateHolding,
+  updateHolding as apiUpdateHolding,
+  deleteHolding as apiDeleteHolding,
+  takeSnapshot as apiTakeSnapshot
+} from "../services/holdingsApi";
+import {
+  bulkUpsertMonthlyRecords as apiBulkUpsertMonthlyRecords,
+  createAccount as apiCreateAccount,
+  deleteAccount as apiDeleteAccount,
+  getAccounts as apiGetAccounts,
+  getMonthlyRecords as apiGetMonthlyRecords,
+  reorderAccounts as apiReorderAccounts,
+  updateAccount as apiUpdateAccount,
+} from "../services/accountsApi";
 
 // --- 介面定義 (Interfaces) ---
 
@@ -279,7 +294,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     return account.name;
   }
 
-  /** 從 Firebase 讀取帳戶列表 */
+  /** 從 Worker API 讀取帳戶列表 */
   async function fetchAccounts() {
     if (isMockMode) {
       accounts.value = seedAccounts;
@@ -290,14 +305,8 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       return;
     }
 
-    const user = auth?.currentUser;
-    if (!user || !db) return;
     try {
-      const q = query(collection(db, "accounts"), where("user_id", "==", user.uid), orderBy("sort_order", "asc"), orderBy("created_at", "asc"));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => doc.data() as Account);
-
-      accounts.value = data;
+      accounts.value = await apiGetAccounts();
       // 更新選取的帳戶列表，預設全選
       if (selectedAccountIds.value.length === 0) {
         selectedAccountIds.value = accounts.value.map(a => a.id);
@@ -307,101 +316,51 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
   }
 
-  /** 從 Firebase 讀取每月紀錄 */
+  /** 從 Worker API 讀取每月紀錄 */
   async function fetchRecords() {
     if (isMockMode) {
       records.value = seedRecords;
       return;
     }
 
-    const user = auth?.currentUser;
-    if (!user || !db) return;
     try {
-      const q = query(collection(db, "monthly_records"), where("user_id", "==", user.uid));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => doc.data());
-
-      // 轉換欄位名稱 (snake_case -> camelCase) 以符合前端型別
-      records.value = data.map((item: any) => ({
-        accountId: item.account_id,
-        month: item.month,
-        amount: Number(item.amount)
-      }));
+      records.value = await apiGetMonthlyRecords();
     } catch (error) {
       console.error("Error fetching records:", error);
     }
   }
 
-  /** 從 Firebase 讀取投資部位 */
+  /** 從 Worker API 讀取投資部位 */
   async function fetchHoldings() {
     if (isMockMode) {
-      holdings.value = seedInvestments.map(h => ({ ...h }));
+      holdings.value = seedInvestments.map(h => ({ ...h })) as Holding[];
       return;
     }
 
-    const user = auth?.currentUser;
-    if (!user || !db) return;
-
     try {
-      const q = query(collection(db, "holdings"), where("user_id", "==", user.uid), orderBy("sort_order", "asc"));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(doc => doc.data());
-
-      holdings.value = data.map(row => ({
-        id: row.id,
-        symbol: row.symbol,
-        market: row.market,
-        name: row.name,
-        shares: row.shares,
-        loaned_shares: row.loaned_shares,
-        cost_basis: row.cost_basis,
-        current_price: row.current_price,
-        currency: row.currency,
-      }));
+      holdings.value = await apiGetHoldings();
     } catch (error) {
-       console.error("Error fetching holdings:", error);
+      console.error("Error fetching holdings:", error);
     }
   }
 
   /** 新增投資部位 */
   async function addHolding(payload: Omit<Holding, "id">): Promise<ActionResult> {
     if (isMockMode) {
-      holdings.value.push({ ...payload, id: "inv-" + Date.now() });
+      holdings.value.push({ ...payload, id: Date.now() });
       return { type: "success", message: "已新增部位。" };
     }
 
-    const user = auth?.currentUser;
-    if (!user || !db) return { type: "error", message: "請先登入。" };
-
     try {
-      const newDocRef = doc(collection(db, "holdings"));
-      const docData = {
-        id: newDocRef.id,
-        user_id: user.uid,
+      const newHolding = await apiCreateHolding({
         symbol: payload.symbol,
         market: payload.market,
         name: payload.name,
-        shares: payload.shares ?? 0,
-        loaned_shares: payload.loaned_shares ?? 0,
-        cost_basis: payload.cost_basis ?? 0,
-        current_price: payload.current_price,
-        currency: payload.currency,
-        sort_order: holdings.value.length
-      };
-
-      await setDoc(newDocRef, docData);
-
-      holdings.value.push({
-        id: docData.id,
-        symbol: docData.symbol,
-        market: docData.market,
-        name: docData.name,
-        shares: docData.shares,
-        loaned_shares: docData.loaned_shares,
-        cost_basis: docData.cost_basis,
-        current_price: docData.current_price,
-        currency: docData.currency,
+        quantity: payload.quantity,
+        avg_cost: payload.avgCost,
+        currency: payload.currency
       });
+      holdings.value.push(newHolding);
       return { type: "success", message: "已新增部位。" };
     } catch (error: any) {
       return { type: "error", message: `新增失敗: ${error.message}` };
@@ -409,19 +368,20 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   }
 
   /** 更新投資部位 */
-  async function updateHolding(id: string, updates: Partial<Omit<Holding, "id">>): Promise<ActionResult> {
+  async function updateHolding(id: number, updates: Partial<Omit<Holding, "id">>): Promise<ActionResult> {
     if (isMockMode) {
       const idx = holdings.value.findIndex(h => h.id === id);
       if (idx !== -1) holdings.value[idx] = { ...holdings.value[idx], ...updates };
       return { type: "success", message: "已更新部位。" };
     }
 
-    if (!db) return { type: "error", message: "尚未連線資料庫" };
-
     try {
-      await updateDoc(doc(db, "holdings", id), updates as any);
+      const updated = await apiUpdateHolding(id, {
+        quantity: updates.quantity,
+        avg_cost: updates.avgCost
+      });
       const idx = holdings.value.findIndex(h => h.id === id);
-      if (idx !== -1) holdings.value[idx] = { ...holdings.value[idx], ...updates };
+      if (idx !== -1) holdings.value[idx] = updated;
       return { type: "success", message: "已更新部位。" };
     } catch (error: any) {
       return { type: "error", message: `更新失敗: ${error.message}` };
@@ -429,40 +389,32 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   }
 
   /** 刪除投資部位 */
-  async function deleteHolding(id: string): Promise<ActionResult> {
+  async function deleteHolding(id: number): Promise<ActionResult> {
     if (isMockMode) {
       holdings.value = holdings.value.filter(h => h.id !== id);
       return { type: "success", message: "已刪除部位。" };
     }
 
-    if (!db) return { type: "error", message: "尚未連線資料庫" };
-
     try {
-      await deleteDoc(doc(db, "holdings", id));
-      holdings.value = holdings.value.filter(h => h.id !== id);
+      const data = await apiDeleteHolding(id);
+      holdings.value = data;
       return { type: "success", message: "已刪除部位。" };
     } catch (error: any) {
       return { type: "error", message: `刪除失敗: ${error.message}` };
     }
   }
 
-  /** 批次更新報價快取（更新本地狀態，並非同步寫回 DB） */
-  function batchCacheHoldingPrices(prices: Record<string, number>) {
-    holdings.value.forEach(h => {
-      if (prices[h.symbol] !== undefined) {
-        h.current_price = prices[h.symbol];
-      }
-    });
+  /** 觸發每日快照（記錄今日持倉市值） */
+  async function takeSnapshot(): Promise<ActionResult> {
+    if (isMockMode) {
+      return { type: "success", message: "快照建立成功 (mock)。" };
+    }
 
-    // 非同步寫回 DB（fire-and-forget，不阻塞 UI）
-    if (!isMockMode && db) {
-      const batch = writeBatch(db);
-      holdings.value
-        .filter(h => prices[h.symbol] !== undefined)
-        .forEach(h => {
-          batch.update(doc(db!, "holdings", h.id), { current_price: prices[h.symbol] });
-        });
-      void batch.commit().catch(e => console.error("Batch update failed:", e));
+    try {
+      const result = await apiTakeSnapshot();
+      return { type: "success", message: `已建立 ${result.date} 的快照，共 ${result.snapshotCount} 筆。` };
+    } catch (error: any) {
+      return { type: "error", message: `快照失敗: ${error.message}` };
     }
   }
 
@@ -737,39 +689,28 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     return output;
   });
 
-  /** 新增帳戶到 Firebase */
+  /** 新增帳戶到 Worker API */
   async function addAccount(): Promise<ActionResult> {
     if (!newAccount.value.name.trim()) {
       return { type: "error", message: "請先填入帳戶名稱。" };
     }
     
-    const user = auth?.currentUser;
-    if (!user || !db) {
-       return { type: "error", message: "請先登入才能新增帳戶。" };
-    }
-
     // 計算新的排序順序 (放在最後)
     const maxSortOrder = accounts.value.length > 0 
       ? Math.max(...accounts.value.map(a => a.sort_order || 0)) 
       : 0;
 
     try {
-      const newDocRef = doc(collection(db, "accounts"));
-      const payload: any = {
-        id: newDocRef.id,
-        user_id: user.uid,
+      const payload = await apiCreateAccount({
         name: newAccount.value.name.trim(),
         category: newAccount.value.category.trim() || "未分類",
         currency: newAccount.value.currency,
         type: newAccount.value.type,
         sort_order: maxSortOrder + 1,
-        created_at: new Date().toISOString()
-      };
-
-      await setDoc(newDocRef, payload);
+      });
       
       // 更新本地狀態
-      accounts.value.push(payload as Account);
+      accounts.value.push(payload);
       selectedAccountIds.value = [...selectedAccountIds.value, payload.id];
 
       // 重置表單
@@ -785,7 +726,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
   }
 
-  /** 批次儲存/更新每月紀錄到 Firebase */
+  /** 批次儲存/更新每月紀錄到 Worker API */
   async function bulkUpsertMonthlyRecords(
     month: string,
     entries: Array<{
@@ -801,28 +742,9 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       return { type: "error", message: "目前沒有可儲存的帳戶資料。" };
     }
     
-    const user = auth?.currentUser;
-    if (!user || !db) {
-       return { type: "error", message: "請先登入。" };
-    }
-
     try {
-      const batch = writeBatch(db);
-      entries.forEach(entry => {
-        const docId = `${entry.accountId}_${month}`;
-        const data = {
-          user_id: user.uid,
-          account_id: entry.accountId,
-          month: month,
-          amount: Math.max(0, entry.amount)
-        };
-        batch.set(doc(db!, "monthly_records", docId), data, { merge: true });
-      });
-
-      await batch.commit();
-
-      // 重新讀取資料以同步本地狀態 (最保險的做法)
-      await fetchRecords();
+      const result = await apiBulkUpsertMonthlyRecords(month, entries);
+      records.value = result.data;
 
       selectedMonth.value = clampMonth(month);
       return { type: "success", message: `已儲存 ${month} 的資料。` };
@@ -841,26 +763,23 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     selectedMonth.value = latest;
   }
 
-  /** 更新帳戶資訊到 Firebase */
+  /** 更新帳戶資訊到 Worker API */
   async function updateAccountById(accountId: string, updates: Partial<Pick<Account, "name" | "category" | "currency">>): Promise<ActionResult> {
     const account = accounts.value.find((item) => item.id === accountId);
     if (!account) {
       return { type: "error", message: "找不到帳戶。" };
     }
-    if (!db) return { type: "error", message: "尚未連線資料庫。" };
-
-    const payload: any = {};
-    if (updates.name !== undefined) payload.name = updates.name.trim();
-    if (updates.category !== undefined) payload.category = updates.category.trim();
-    if (updates.currency !== undefined) payload.currency = updates.currency;
-
     try {
-      await updateDoc(doc(db, "accounts", accountId), payload);
+      const payload: Partial<Account> = {};
+      if (updates.name !== undefined) payload.name = updates.name.trim();
+      if (updates.category !== undefined) payload.category = updates.category.trim();
+      if (updates.currency !== undefined) payload.currency = updates.currency;
+      const updated = await apiUpdateAccount(accountId, payload);
 
       // 更新本地狀態
       const index = accounts.value.findIndex((item) => item.id === accountId);
       if (index >= 0) {
-        accounts.value[index] = { ...accounts.value[index], ...payload };
+        accounts.value[index] = updated;
       }
       
       return { type: "success", message: `已更新帳戶：${payload.name ?? account.name}` };
@@ -869,7 +788,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
   }
 
-  /** 更新帳戶資訊到 Firebase（接受完整帳戶物件，失敗時拋出例外） */
+  /** 更新帳戶資訊到 Worker API（接受完整帳戶物件，失敗時拋出例外） */
   async function updateAccount(account: Account): Promise<void> {
     const result = await updateAccountById(account.id, {
       name: account.name,
@@ -881,7 +800,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
   }
 
-  /** 更新帳戶排序到 Firebase */
+  /** 更新帳戶排序到 Worker API */
   async function reorderAccount(fromIndex: number, toIndex: number): Promise<ActionResult> {
     const list = [...accounts.value]; // 複製一份
     if (
@@ -897,19 +816,24 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     list.splice(toIndex, 0, moved);
     accounts.value = list;
 
-    if (!db) return { type: "error", message: "尚未連線資料庫" };
-
-    // 準備批次更新資料
     try {
-      const batch = writeBatch(db);
-      list.forEach((acc, index) => {
-         batch.update(doc(db!, "accounts", acc.id), { sort_order: index });
-      });
-      await batch.commit();
+      await apiReorderAccounts(list.map((acc, index) => ({ id: acc.id, sort_order: index })));
       return { type: "success", message: "排序已更新" };
     } catch (err) {
       console.error("Sorting error:", err);
       // 如果失敗，理論上應該 rollback 本地狀態，但這裡暫不處理，下次重新整理會同步
+      return { type: "error", message: "排序儲存失敗" };
+    }
+  }
+
+  /** 批次更新所有帳戶的排序到 Worker API */
+  async function reorderAllAccounts(newList: Account[]): Promise<ActionResult> {
+    accounts.value = [...newList];
+    try {
+      await apiReorderAccounts(newList.map((acc, index) => ({ id: acc.id, sort_order: index })));
+      return { type: "success", message: "排序已更新" };
+    } catch (err) {
+      console.error("Sorting error:", err);
       return { type: "error", message: "排序儲存失敗" };
     }
   }
@@ -920,24 +844,8 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     if (!account) {
       return { type: "error", message: "找不到要刪除的帳戶。" };
     }
-    if (!db) return { type: "error", message: "尚未連線資料庫。" };
-
     try {
-      const batch = writeBatch(db);
-      
-      // 先查詢並刪除關聯的 monthly_records
-      const q = query(collection(db, "monthly_records"), where("account_id", "==", accountId));
-      const snapshot = await getDocs(q);
-      snapshot.docs.forEach(d => {
-         batch.delete(d.ref);
-      });
-
-      // 再刪除 accounts
-      batch.delete(doc(db, "accounts", accountId));
-      await batch.commit();
-
-      // 更新本地狀態
-      accounts.value = accounts.value.filter((item) => item.id !== accountId);
+      accounts.value = await apiDeleteAccount(accountId);
       selectedAccountIds.value = selectedAccountIds.value.filter((id) => id !== accountId);
       records.value = records.value.filter((r) => r.accountId !== accountId);
 
@@ -1004,12 +912,13 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     updateAccountById,
     updateAccount,
     reorderAccount,
+    reorderAllAccounts,
     deleteAccount,
     fetchHoldings,
     addHolding,
     updateHolding,
     deleteHolding,
-    batchCacheHoldingPrices,
+    takeSnapshot,
     initData
   };
 });

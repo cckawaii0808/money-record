@@ -3,7 +3,7 @@
  *
  * 台股清單資料流：
  *   1. 模組載入時立即從 tw_stocks.json 同步初始化記憶體快取（零延遲）
- *   2. initStockCache() 可在背景嘗試升級為 Firebase 資料（正式資料來源）
+ *   2. initStockCache() 僅回傳目前快取狀態，不再讀取 Firestore
  *
  * Mock 資料來源：src/data/tw_stocks.json
  *   原始資料來自臺灣證券交易所 OpenAPI：
@@ -16,8 +16,6 @@
  *     -OutFile "src/data/tw_stocks.json"
  */
 
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "../firebase";
 import rawStocks from "../data/tw_stocks.json";
 
 // ── 型別 ──────────────────────────────────────────────────────────────────
@@ -70,7 +68,7 @@ function parseMockStocks(): StockRecord[] {
 /**
  * 目前使用中的股票清單。
  * 模組載入時立即用 JSON mock 資料填充，搜尋功能無需等待任何 async 操作。
- * initStockCache() 成功後會替換為 Firebase 資料。
+ * 不再從 Firebase Firestore 載入資料，避免非認證資料來源造成權限錯誤。
  */
 let _activeStocks: StockRecord[] = parseMockStocks();
 
@@ -81,34 +79,15 @@ export function getActiveStocks(): StockRecord[] {
   return _activeStocks;
 }
 
-// ── 升級至 Firebase ───────────────────────────────────────────────────────
+// ── 快取初始化狀態 ───────────────────────────────────────────────────────
 
 /**
- * 嘗試從 Firebase stocks 集合載入股票清單，覆蓋記憶體快取。
- * 若 Firebase 無資料或失敗，保留 mock JSON 快取，靜默跳過。
+ * 回傳目前台股清單快取狀態。
  *
- * 頁面 onMounted 時在背景呼叫，不阻塞搜尋功能。
+ * 說明：
+ * - 台股清單已在模組載入時由 JSON 初始化。
+ * - 此函式保留 async 介面，避免呼叫端需要調整。
  */
-export async function initStockCache(): Promise<{ source: "firebase" | "mock"; count: number }> {
-  try {
-    if (!db) {
-       return { source: "mock", count: _activeStocks.length };
-    }
-    const q = query(collection(db, "stocks"), where("market", "==", "TW"));
-    const querySnapshot = await getDocs(q);
-    const data = querySnapshot.docs.map(doc => doc.data() as StockRecord);
-
-    if (data.length > 0) {
-      _activeStocks = data;
-      console.log(`[stockListSync] 升級為 Firebase 資料：${data.length} 筆`);
-      return { source: "firebase", count: data.length };
-    }
-
-  } catch (e: any) {
-    console.warn(`[stockListSync] Firebase 讀取失敗，保留 mock: ${e.message}`);
-  }
-
-  // 保留 mock JSON 快取
+export async function initStockCache(): Promise<{ source: "mock"; count: number }> {
   return { source: "mock", count: _activeStocks.length };
 }
-

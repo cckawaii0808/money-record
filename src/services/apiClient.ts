@@ -76,3 +76,114 @@ export async function apiGet<T = unknown>(path: string): Promise<T> {
 
   return res.json() as Promise<T>;
 }
+
+/**
+ * 帶認證的 POST 請求。
+ *
+ * @param path - API 路徑
+ * @param body - 要傳送的物件資料
+ * @returns 解析後的 JSON 資料
+ */
+export async function apiPost<T = unknown>(
+  path: string,
+  body?: unknown
+): Promise<T> {
+  const res = await apiFetch(path, {
+    method: "POST",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const errorBody = (await res.json()) as { message?: string };
+      if (errorBody.message) message = errorBody.message;
+    } catch {
+      // 忽略 JSON 解析失敗
+    }
+    throw new Error(`[Worker API] ${message}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+/**
+ * 帶認證的 PATCH 請求。
+ *
+ * @param path - API 路徑
+ * @param body - 要傳送的物件資料
+ * @returns 解析後的 JSON 資料
+ */
+export async function apiPatch<T = unknown>(
+  path: string,
+  body: unknown
+): Promise<T> {
+  const res = await apiFetch(path, {
+    method: "PATCH",
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const errorBody = (await res.json()) as { message?: string };
+      if (errorBody.message) message = errorBody.message;
+    } catch {
+      // 忽略 JSON 解析失敗
+    }
+    throw new Error(`[Worker API] ${message}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+/**
+ * 帶認證的 PUT 請求。
+ */
+export async function apiPut<T = unknown>(
+  path: string,
+  body: unknown
+): Promise<T> {
+  const res = await apiFetch(path, {
+    method: "PUT",
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const errorBody = (await res.json()) as { message?: string };
+      if (errorBody.message) message = errorBody.message;
+    } catch {
+      // 忽略 JSON 解析失敗
+    }
+    throw new Error(`[Worker API] ${message}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+/**
+ * 帶認證的 DELETE 請求。
+ *
+ * @param path - API 路徑
+ * @returns 解析後的 JSON 資料
+ */
+export async function apiDelete<T = unknown>(path: string): Promise<T> {
+  const res = await apiFetch(path, {
+    method: "DELETE"
+  });
+
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const errorBody = (await res.json()) as { message?: string };
+      if (errorBody.message) message = errorBody.message;
+    } catch {
+      // 忽略 JSON 解析失敗
+    }
+    throw new Error(`[Worker API] ${message}`);
+  }
+
+  return res.json() as Promise<T>;
+}

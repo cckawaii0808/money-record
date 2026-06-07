@@ -24,10 +24,10 @@ const { isDesktop } = useIsDesktop();
     >
       <i class="pi pi-check-circle text-4xl text-green-500 mb-4"></i>
       <h2 class="text-lg font-bold text-[var(--text-main)] mb-2">
-        帳戶管理已遷移
+        帳戶管理已整合
       </h2>
       <p class="text-[var(--text-sub)] text-sm">
-        為了讓您能更直覺地操作，所有的「帳戶新增、編輯、刪除」功能已經全部整併到
+        為了讓您能更直覺地操作，所有的「帳戶新增、編輯、刪除」功能都集中在
         <span class="font-bold text-[var(--primary)]">每月記錄</span> 頁面中囉！
       </p>
     </div>
