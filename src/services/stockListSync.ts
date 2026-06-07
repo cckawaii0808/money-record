@@ -72,8 +72,6 @@ function parseMockStocks(): StockRecord[] {
  */
 let _activeStocks: StockRecord[] = parseMockStocks();
 
-console.log(`[stockListSync] 初始化完成（mock JSON）：${_activeStocks.length} 筆`);
-
 /** 取得目前記憶體中的股票清單 */
 export function getActiveStocks(): StockRecord[] {
   return _activeStocks;

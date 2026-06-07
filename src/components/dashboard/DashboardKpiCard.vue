@@ -20,7 +20,7 @@ defineProps<{
 
 <template>
   <!-- 載入中狀態 -->
-  <div v-if="loading" class="apollo-card flex justify-between items-center gap-4">
+  <div v-if="loading" class="apollo-card flex justify-between items-center gap-4 min-h-[162px] sm:min-h-0">
     <div class="flex flex-col gap-2 flex-1">
       <Skeleton width="40%" height="14px" borderRadius="6px" />
       <Skeleton width="60%" height="28px" borderRadius="8px" />
@@ -39,13 +39,13 @@ defineProps<{
   </div>
 
   <!-- 正常狀態 -->
-  <div v-else class="apollo-card flex justify-between items-center gap-4">
+  <div v-else class="apollo-card flex justify-between items-center gap-4 min-h-[162px] sm:min-h-0">
     <!-- 左側：本月淨值與增減 -->
-    <div class="flex flex-col gap-0.5">
+    <div class="flex flex-col gap-0.5 flex-1 min-w-0">
       <span class="text-[12px] sm:text-[13px] font-bold text-[var(--text-sub)]">
         本月淨值 (TWD)
       </span>
-      <span class="text-xl sm:text-2xl md:text-3xl font-extrabold text-[var(--text-main)] tabular-nums tracking-tight">
+      <span class="text-[clamp(22px,7vw,28px)] sm:text-3xl leading-tight font-extrabold text-[var(--text-main)] tabular-nums tracking-tight truncate">
         {{ netWorth }}
       </span>
       
@@ -72,18 +72,18 @@ defineProps<{
     </div>
 
     <!-- 右側：總資產與總負債並排 -->
-    <div class="grid grid-cols-2 gap-4 sm:gap-12 shrink-0">
+    <div class="grid grid-cols-2 gap-4 sm:gap-12 shrink-0 self-center">
       <!-- 總資產 -->
       <div class="flex flex-col gap-0.5 items-center text-center">
         <span class="text-[10px] sm:text-[11px] font-bold text-[var(--text-sub)]">總資產</span>
-        <span class="text-base sm:text-lg md:text-xl font-extrabold text-[var(--positive)] tabular-nums">
+        <span class="text-[clamp(17px,5vw,21px)] sm:text-xl leading-tight font-extrabold text-[var(--positive)] tabular-nums whitespace-nowrap">
           {{ totalAsset }}
         </span>
       </div>
       <!-- 總負債 -->
       <div class="flex flex-col gap-0.5 items-center text-center">
         <span class="text-[10px] sm:text-[11px] font-bold text-[var(--text-sub)]">總負債</span>
-        <span class="text-base sm:text-lg md:text-xl font-extrabold text-[var(--negative)] tabular-nums">
+        <span class="text-[clamp(17px,5vw,21px)] sm:text-xl leading-tight font-extrabold text-[var(--negative)] tabular-nums whitespace-nowrap">
           {{ totalLiability }}
         </span>
       </div>
