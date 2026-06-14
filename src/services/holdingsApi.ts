@@ -7,7 +7,7 @@
  */
 
 import { apiGet, apiPost, apiPatch, apiDelete } from "./apiClient";
-import type { Holding } from "../types";
+import type { Holding, InvestmentSnapshotPoint } from "../types";
 
 // ============================================================================
 // 型別定義
@@ -65,6 +65,11 @@ export interface SnapshotResponse {
  */
 export interface SnapshotDataPoint {
   date: string;
+  capturedAt?: string;
+  twValue: number;
+  usValue: number;
+  twCost: number;
+  usCost: number;
   totalValue: number;
   totalCost: number;
   holdings: Array<{
@@ -150,7 +155,7 @@ export async function takeSnapshot(): Promise<SnapshotResponse["data"]> {
 export async function getSnapshots(
   startDate?: string,
   endDate?: string
-): Promise<SnapshotDataPoint[]> {
+): Promise<InvestmentSnapshotPoint[]> {
   let path = "/api/holdings/snapshots";
   const params: string[] = [];
   if (startDate) params.push(`startDate=${encodeURIComponent(startDate)}`);
@@ -158,5 +163,14 @@ export async function getSnapshots(
   if (params.length > 0) path += "?" + params.join("&");
 
   const res = await apiGet<SnapshotsResponse>(path);
-  return res.data;
+  return res.data.map((item) => ({
+    date: item.date,
+    capturedAt: item.capturedAt,
+    twValue: item.twValue ?? 0,
+    usValue: item.usValue ?? 0,
+    twCost: item.twCost ?? 0,
+    usCost: item.usCost ?? 0,
+    totalValue: item.totalValue,
+    totalCost: item.totalCost,
+  }));
 }

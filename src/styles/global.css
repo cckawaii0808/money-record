@@ -96,12 +96,14 @@ h1, h2, h3, h4, h5, h6 {
 
 .app-toast.p-toast {
   width: min(440px, calc(100vw - 32px)) !important;
-  top: max(1rem, env(safe-area-inset-top)) !important;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+  right: 1rem !important;
 }
 
 @media (min-width: 1024px) {
   .app-toast.p-toast {
-    top: 6rem !important;
+    bottom: 1.5rem !important;
+    right: 1.5rem !important;
   }
 }
 

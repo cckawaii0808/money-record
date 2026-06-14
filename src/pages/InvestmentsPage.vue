@@ -10,6 +10,7 @@ import Tag from "primevue/tag";
 import Select from "primevue/select";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
+import InvestmentTrendChart from "../components/investments/InvestmentTrendChart.vue";
 import type { Holding } from "../types";
 import type { Currency } from "../types";
 import { useAssetManagerStore } from "../stores/assetManager";
@@ -59,6 +60,8 @@ const syncMarket = ref<"ALL" | "TW" | "US">("ALL");
 const syncAccountTW = ref("");
 const syncAccountUS = ref("");
 const isRefreshingAll = ref(false);
+const isLoadingTrend = ref(false);
+const trendRange = ref<{ startDate?: string; endDate?: string }>({});
 
 // ── 工具函式 ──
 const isSupportedCurrency = (c: string): c is Currency =>
@@ -282,15 +285,28 @@ async function refreshPrices() {
     if (store.holdings.length > 0) {
       const result = await store.takeSnapshot();
       if (result.type === "success") {
-        toast.add({ severity: "success", summary: "報價更新成功", detail: `已取得最新報價，共同步 ${store.holdings.length} 筆標的。`, life: 3000 });
+        await loadInvestmentTrend(trendRange.value);
+        toast.add({ severity: "success", summary: "報價更新成功", detail: `已取得最新報價，並建立本次股票資產快照。`, life: 3000 });
       } else {
         toast.add({ severity: "error", summary: "紀錄錯誤", detail: result.message, life: 3000 });
       }
+    } else {
+      await loadInvestmentTrend(trendRange.value);
     }
   } catch (err: any) {
     toast.add({ severity: "error", summary: "錯誤", detail: err.message || "更新失敗", life: 3000 });
   } finally {
     isRefreshingAll.value = false;
+  }
+}
+
+async function loadInvestmentTrend(range: { startDate?: string; endDate?: string } = trendRange.value) {
+  trendRange.value = range;
+  isLoadingTrend.value = true;
+  try {
+    await store.fetchInvestmentSnapshots(range.startDate, range.endDate);
+  } finally {
+    isLoadingTrend.value = false;
   }
 }
 
@@ -493,6 +509,13 @@ onMounted(() => {
         </div>
       </section>
     </div>
+
+    <InvestmentTrendChart
+      :snapshots="store.investmentSnapshots"
+      :usd-to-twd="store.fxRates.USD"
+      :loading="isLoadingTrend"
+      @range-change="loadInvestmentTrend"
+    />
 
     <!-- ─── 新增/編輯 Dialog ─── -->
     <Dialog v-model:visible="editVisible" :header="isEditing ? '編輯投資' : (editForm.market === 'TW' ? '新增台股' : '新增美股')" modal :draggable="false" :style="{ width: '90vw', maxWidth: '400px' }">

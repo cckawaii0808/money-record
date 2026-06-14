@@ -4,7 +4,7 @@ import { defineStore } from "pinia";
 interface SelectOption { label: string; value: string | number; }
 
 import { EARLIEST_SELECTABLE_MONTH } from "../constants";
-import type { Account, AccountType, Currency, Holding, MonthlyRecord } from "../types";
+import type { Account, AccountType, Currency, Holding, InvestmentSnapshotPoint, MonthlyRecord } from "../types";
 import { formatCurrency, formatPct } from "../utils/formatters";
 import {
   getCurrentMonth,
@@ -22,7 +22,8 @@ import {
   createHolding as apiCreateHolding,
   updateHolding as apiUpdateHolding,
   deleteHolding as apiDeleteHolding,
-  takeSnapshot as apiTakeSnapshot
+  takeSnapshot as apiTakeSnapshot,
+  getSnapshots as apiGetSnapshots
 } from "../services/holdingsApi";
 import {
   bulkUpsertMonthlyRecords as apiBulkUpsertMonthlyRecords,
@@ -104,6 +105,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   const accounts = ref<Account[]>([]);
   const records = ref<MonthlyRecord[]>([]);
   const holdings = ref<Holding[]>([]);
+  const investmentSnapshots = ref<InvestmentSnapshotPoint[]>([]);
   const isLoading = ref(false); // 資料載入中狀態
 
   // 匯率相關狀態
@@ -407,14 +409,74 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   /** 觸發每日快照（記錄今日持倉市值） */
   async function takeSnapshot(): Promise<ActionResult> {
     if (isMockMode) {
+      const now = new Date();
+      const date = now.toISOString().slice(0, 10);
+      const twValue = holdings.value
+        .filter((h) => h.market === "TW")
+        .reduce((sum, h) => sum + h.marketValue, 0);
+      const usValue = holdings.value
+        .filter((h) => h.market === "US")
+        .reduce((sum, h) => sum + h.marketValue, 0);
+      investmentSnapshots.value.push({
+        date,
+        capturedAt: now.toLocaleString("zh-TW", { hour12: false }),
+        twValue,
+        usValue,
+        twCost: holdings.value
+          .filter((h) => h.market === "TW")
+          .reduce((sum, h) => sum + h.quantity * h.avgCost, 0),
+        usCost: holdings.value
+          .filter((h) => h.market === "US")
+          .reduce((sum, h) => sum + h.quantity * h.avgCost, 0),
+        totalValue: twValue + usValue,
+        totalCost: 0,
+      });
       return { type: "success", message: "快照建立成功 (mock)。" };
     }
 
     try {
       const result = await apiTakeSnapshot();
+      await fetchInvestmentSnapshots();
       return { type: "success", message: `已建立 ${result.date} 的快照，共 ${result.snapshotCount} 筆。` };
     } catch (error: any) {
       return { type: "error", message: `快照失敗: ${error.message}` };
+    }
+  }
+
+  /** 取得股票資產變化快照 */
+  async function fetchInvestmentSnapshots(startDate?: string, endDate?: string) {
+    if (isMockMode) {
+      if (investmentSnapshots.value.length === 0) {
+        const today = new Date();
+        investmentSnapshots.value = Array.from({ length: 8 }, (_, index) => {
+          const d = new Date(today);
+          d.setDate(today.getDate() - (7 - index));
+          const factor = 0.94 + index * 0.012;
+          const twValue = seedInvestments
+            .filter((h) => h.market === "TW")
+            .reduce((sum, h) => sum + h.marketValue * factor, 0);
+          const usValue = seedInvestments
+            .filter((h) => h.market === "US")
+            .reduce((sum, h) => sum + h.marketValue * factor, 0);
+          return {
+            date: d.toISOString().slice(0, 10),
+            capturedAt: d.toLocaleString("zh-TW", { hour12: false }),
+            twValue,
+            usValue,
+            twCost: 0,
+            usCost: 0,
+            totalValue: twValue + usValue,
+            totalCost: 0,
+          };
+        });
+      }
+      return;
+    }
+
+    try {
+      investmentSnapshots.value = await apiGetSnapshots(startDate, endDate);
+    } catch (error) {
+      console.error("Error fetching investment snapshots:", error);
     }
   }
 
@@ -864,6 +926,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     accounts,
     records,
     holdings,
+    investmentSnapshots,
     isLoading,
     fxRates,
     fxLoading,
@@ -919,6 +982,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     updateHolding,
     deleteHolding,
     takeSnapshot,
+    fetchInvestmentSnapshots,
     initData
   };
 });

@@ -33,3 +33,14 @@ export interface Holding {
   gainLossPct: number | null;
   updatedAt: string;
 }
+
+export interface InvestmentSnapshotPoint {
+  date: string;
+  capturedAt?: string;
+  twValue: number;
+  usValue: number;
+  twCost: number;
+  usCost: number;
+  totalValue: number;
+  totalCost: number;
+}
