@@ -118,6 +118,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   const fxUpdatedAt = ref("");
   const fxSource = "open.er-api.com";
   let dataInitialized = false; // 是否已初始化資料
+  let investmentSnapshotsRequestSeq = 0;
 
   const currentMonth = ref(getCurrentMonth());
 
@@ -409,42 +410,65 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   /** 觸發每日快照（記錄今日持倉市值） */
   async function takeSnapshot(): Promise<ActionResult> {
     if (isMockMode) {
-      const now = new Date();
-      const date = now.toISOString().slice(0, 10);
-      const twValue = holdings.value
-        .filter((h) => h.market === "TW")
-        .reduce((sum, h) => sum + h.marketValue, 0);
-      const usValue = holdings.value
-        .filter((h) => h.market === "US")
-        .reduce((sum, h) => sum + h.marketValue, 0);
-      investmentSnapshots.value.push({
-        date,
-        capturedAt: now.toLocaleString("zh-TW", { hour12: false }),
-        twValue,
-        usValue,
-        twCost: holdings.value
-          .filter((h) => h.market === "TW")
-          .reduce((sum, h) => sum + h.quantity * h.avgCost, 0),
-        usCost: holdings.value
-          .filter((h) => h.market === "US")
-          .reduce((sum, h) => sum + h.quantity * h.avgCost, 0),
-        totalValue: twValue + usValue,
-        totalCost: 0,
-      });
+      recordCurrentInvestmentSnapshot();
       return { type: "success", message: "快照建立成功 (mock)。" };
     }
 
     try {
       const result = await apiTakeSnapshot();
-      await fetchInvestmentSnapshots();
+      // 先即時把本次更新反映到畫面；後續再由 API 歷史資料覆蓋。
+      recordCurrentInvestmentSnapshot();
       return { type: "success", message: `已建立 ${result.date} 的快照，共 ${result.snapshotCount} 筆。` };
     } catch (error: any) {
       return { type: "error", message: `快照失敗: ${error.message}` };
     }
   }
 
+  function formatLocalDateTime(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hour = String(date.getHours()).padStart(2, "0");
+    const minute = String(date.getMinutes()).padStart(2, "0");
+    const second = String(date.getSeconds()).padStart(2, "0");
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+  }
+
+  /** 以目前畫面上的持倉資料建立一筆即時快照，避免等待後端歷史資料時圖表看起來沒有更新。 */
+  function recordCurrentInvestmentSnapshot(): void {
+    const now = new Date();
+    const date = formatLocalDateTime(now).slice(0, 10);
+    const capturedAt = formatLocalDateTime(now);
+    const twHoldings = holdings.value.filter((h) => h.market === "TW");
+    const usHoldings = holdings.value.filter((h) => h.market === "US");
+    const twValue = twHoldings.reduce((sum, h) => sum + h.marketValue, 0);
+    const usValue = usHoldings.reduce((sum, h) => sum + h.marketValue, 0);
+    const twCost = twHoldings.reduce((sum, h) => sum + h.quantity * h.avgCost, 0);
+    const usCost = usHoldings.reduce((sum, h) => sum + h.quantity * h.avgCost, 0);
+
+    investmentSnapshots.value = [
+      ...investmentSnapshots.value,
+      {
+        date,
+        capturedAt,
+        twValue,
+        usValue,
+        twCost,
+        usCost,
+        totalValue: twValue + usValue,
+        totalCost: twCost + usCost,
+      },
+    ];
+  }
+
   /** 取得股票資產變化快照 */
-  async function fetchInvestmentSnapshots(startDate?: string, endDate?: string) {
+  async function fetchInvestmentSnapshots(
+    startDate?: string,
+    endDate?: string,
+    options: { preserveCurrentOnEmpty?: boolean } = {}
+  ) {
+    const requestSeq = ++investmentSnapshotsRequestSeq;
+
     if (isMockMode) {
       if (investmentSnapshots.value.length === 0) {
         const today = new Date();
@@ -474,7 +498,12 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
 
     try {
-      investmentSnapshots.value = await apiGetSnapshots(startDate, endDate);
+      const data = await apiGetSnapshots(startDate, endDate);
+      if (requestSeq !== investmentSnapshotsRequestSeq) return;
+      if (data.length === 0 && options.preserveCurrentOnEmpty && investmentSnapshots.value.length > 0) {
+        return;
+      }
+      investmentSnapshots.value = data;
     } catch (error) {
       console.error("Error fetching investment snapshots:", error);
     }
@@ -983,6 +1012,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     deleteHolding,
     takeSnapshot,
     fetchInvestmentSnapshots,
+    recordCurrentInvestmentSnapshot,
     initData
   };
 });

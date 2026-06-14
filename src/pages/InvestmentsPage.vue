@@ -61,7 +61,25 @@ const syncAccountTW = ref("");
 const syncAccountUS = ref("");
 const isRefreshingAll = ref(false);
 const isLoadingTrend = ref(false);
-const trendRange = ref<{ startDate?: string; endDate?: string }>({});
+
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function defaultInvestmentTrendRange(): { startDate: string; endDate: string } {
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(today.getDate() - 29);
+  return {
+    startDate: toDateInputValue(start),
+    endDate: toDateInputValue(today),
+  };
+}
+
+const trendRange = ref<{ startDate?: string; endDate?: string }>(defaultInvestmentTrendRange());
 
 // ── 工具函式 ──
 const isSupportedCurrency = (c: string): c is Currency =>
@@ -285,7 +303,7 @@ async function refreshPrices() {
     if (store.holdings.length > 0) {
       const result = await store.takeSnapshot();
       if (result.type === "success") {
-        await loadInvestmentTrend(trendRange.value);
+        await loadInvestmentTrend(trendRange.value, true);
         toast.add({ severity: "success", summary: "報價更新成功", detail: `已取得最新報價，並建立本次股票資產快照。`, life: 3000 });
       } else {
         toast.add({ severity: "error", summary: "紀錄錯誤", detail: result.message, life: 3000 });
@@ -300,11 +318,14 @@ async function refreshPrices() {
   }
 }
 
-async function loadInvestmentTrend(range: { startDate?: string; endDate?: string } = trendRange.value) {
+async function loadInvestmentTrend(
+  range: { startDate?: string; endDate?: string } = trendRange.value,
+  preserveCurrentOnEmpty = false,
+) {
   trendRange.value = range;
   isLoadingTrend.value = true;
   try {
-    await store.fetchInvestmentSnapshots(range.startDate, range.endDate);
+    await store.fetchInvestmentSnapshots(range.startDate, range.endDate, { preserveCurrentOnEmpty });
   } finally {
     isLoadingTrend.value = false;
   }

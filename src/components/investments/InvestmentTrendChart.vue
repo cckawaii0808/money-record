@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import Chart from "primevue/chart";
 import Skeleton from "primevue/skeleton";
 import Button from "primevue/button";
@@ -70,10 +70,6 @@ watch([customStartDate, customEndDate], () => {
   if (selectedPreset.value === "custom") {
     applyRange("custom");
   }
-});
-
-onMounted(() => {
-  applyRange(selectedPreset.value);
 });
 
 const normalizedRows = computed(() =>
