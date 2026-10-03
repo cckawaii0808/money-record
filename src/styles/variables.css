@@ -1,74 +1,44 @@
-/**
- * variables.css — Apollo Theme Exact Match
- * 設計方向：PrimeVue Apollo 模板像素級還原
- * 字型：DM Sans（現代無襯線）
- */
-
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap");
-
-:root,
-:root[data-theme="light"] {
-  /* --- 核心背景與表面 (Apollo: 冷灰底色, 純白表面) --- */
-  --app-bg:      #f4f6f9;      /* 極度還原的冷灰色背景 */
-  --surface:     #ffffff;      /* 卡片純白 */
-  --surface-elev: rgba(255,255,255,0.98);
-
-  /* --- 文字字體與顏色 --- */
-  --text-main:  #1e293b;       /* 深沉的標題色 */
-  --text-sub:   #64748b;       /* 次要文字、標籤色 */
-  --text-muted: #94a3b8;       /* 提示性弱文字 */
-  
-  /* --- 線條 --- */
-  --line-soft:   #e2e8f0;      /* 卡片外框或分割線 (很淡的灰) */
+/* 工作台色盤：中性背景、清楚文字，色彩僅標示重點與資料語意。 */
+:root, :root[data-theme="light"] {
+  color-scheme: light;
+  --app-bg: #f5f7fa;
+  --surface: #fff;
+  --surface-elev: #fff;
+  --text-main: #172b42;
+  --text-sub: #586b80;
+  --text-muted: #708197;
+  --line-soft: #e2e8f0;
   --line-strong: #cbd5e1;
-
-  /* --- 主題色 (Apollo 的品牌綠與按鈕色) --- */
-  --primary:       #10b981;    /* Emerald-500: Apollo 預設偏好的活潑綠 */
-  --primary-hover: #059669;    /* Emerald-600 */
-  --primary-soft:  #ecfdf5;    /* Emerald-50 */
-  --primary-ring:  rgba(16, 185, 129, 0.15);
-
-  /* --- 語意色 (Apollo 風格的漲跌色) --- */
-  --positive: #10b981;         /* Emerald-500 */
-  --negative: #f43f5e;         /* Rose-500 */
-  --warn:     #f59e0b;         /* Amber-500 */
-
-  /* --- 側邊欄專屬色 --- */
-  --sidebar-bg:          #ffffff;
-  --sidebar-text:        #475569;
-  --sidebar-text-muted:  #94a3b8;
-  --sidebar-active-bg:   transparent;
+  --primary: #087f72;
+  --primary-hover: #06665c;
+  --primary-soft: #e8f5f1;
+  --primary-ring: rgba(8,127,114,.18);
+  --positive: #087f72;
+  --negative: #c54856;
+  --warn: #a96916;
+  --sidebar-bg: var(--surface);
+  --sidebar-text: var(--text-sub);
+  --sidebar-text-muted: var(--text-muted);
+  --sidebar-active-bg: var(--primary-soft);
   --sidebar-active-text: var(--primary);
-
-  /* --- 卡片專屬陰影設定 --- 
-     Apollo 卡片陰影極輕，稍微帶點垂直位移，散發著「乾淨」感
-  */
-  --card-shadow: 0 4px 10px rgba(0,0,0,0.03), 0 0 2px rgba(0,0,0,0.06);
-  --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.03);
+  --card-shadow: none;
+  --sidebar-shadow: none;
 }
-
-/* 深色模式暫時保留相對值，此階段重心在對齊淺色 Apollo 版 */
 :root[data-theme="dark"] {
-  --app-bg:     #0f172a;
-  --surface:    #1e293b;
-  --surface-elev: rgba(30,41,59,0.95);
-  --text-main:  #f8fafc;
-  --text-sub:   #94a3b8;
-  --text-muted: #64748b;
-  --line-soft:   rgba(255,255,255,0.08);
-  --line-strong: rgba(255,255,255,0.15);
-  --primary:       #34d399;
-  --primary-hover: #10b981;
-  --primary-soft:  rgba(52, 211, 153, 0.1);
-  --primary-ring:  rgba(52, 211, 153, 0.2);
-  --positive: #34d399;
-  --negative: #fb7185;
-  --warn:     #fbbf24;
-  --sidebar-bg:          #1e293b;
-  --sidebar-text:        #e2e8f0;
-  --sidebar-text-muted:  #94a3b8;
-  --sidebar-active-bg:   transparent;
-  --sidebar-active-text: var(--primary);
-  --card-shadow: 0 8px 30px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.2);
-  --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.4);
+  color-scheme: dark;
+  --app-bg: #101923;
+  --surface: #192532;
+  --surface-elev: #1d2b3a;
+  --text-main: #edf3fa;
+  --text-sub: #b1bfd0;
+  --text-muted: #8c9db1;
+  --line-soft: #2b3b4d;
+  --line-strong: #40536a;
+  --primary: #58d2b5;
+  --primary-hover: #7ee3ca;
+  --primary-soft: #203d3b;
+  --primary-ring: rgba(88,210,181,.2);
+  --positive: #58d2b5;
+  --negative: #fb8997;
+  --warn: #edb865;
 }

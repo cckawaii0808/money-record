@@ -3,7 +3,7 @@
  *
  * 台股搜尋：從記憶體快取（getActiveStocks）做客戶端模糊過濾。
  * 快取來源由 stockListSync 模組載入時同步初始化（tw_stocks.json），
- * 或 initStockCache() 升級為 Firebase 資料後替換。
+ * initStockCache() 僅回傳目前快取狀態。
  */
 
 import { getActiveStocks } from "./stockListSync";
@@ -17,7 +17,7 @@ export interface StockListItem {
 }
 
 /**
- * 搜尋台股（優先記憶體快取，fallback Yahoo Finance）
+ * 搜尋台股（從本地 JSON 初始化的記憶體快取過濾）
  *
  * @param query  使用者輸入（支援代號 / 中文名稱）
  * @param market 市場篩選，預設 "TW"
@@ -60,9 +60,4 @@ export function searchStocksFromCache(
       return aCode.localeCompare(bCode);
     })
     .slice(0, limit);
-}
-
-/** 確認記憶體快取是否已就緒 */
-export function checkStockCacheReady(): boolean {
-  return getActiveStocks().length > 0;
 }

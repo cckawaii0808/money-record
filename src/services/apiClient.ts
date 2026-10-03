@@ -4,7 +4,7 @@
  * 說明：
  * - 統一處理 Firebase ID Token 取得與注入。
  * - 所有打 Worker 的請求都走這裡，不要直接用 fetch。
- * - VITE_API_BASE_URL 未設定時，fallback 到 workers.dev 網址。
+ * - VITE_API_BASE_URL 未設定時，使用下方預設 Worker API 網址。
  */
 
 import { auth } from "../firebase";
@@ -39,7 +39,11 @@ export async function apiFetch(
   path: string,
   options: RequestInit = {}
 ): Promise<Response> {
+  const requestUid = auth?.currentUser?.uid;
   const token = await getIdToken();
+  if (requestUid !== auth?.currentUser?.uid) {
+    throw new Error("帳戶已切換，已取消舊帳戶的 API 請求。");
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

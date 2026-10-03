@@ -3,6 +3,7 @@ import { auth, isMockMode } from "../firebase";
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
+  scrollBehavior: () => ({ top: 0 }),
   routes: [
     {
       path: "/login",
@@ -32,10 +33,14 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: "/settings",
-      name: "settings",
-      component: () => import("../pages/SettingsPage.vue"),
+      path: "/leaderboard",
+      name: "leaderboard",
+      component: () => import("../pages/LeaderboardPage.vue"),
       meta: { requiresAuth: true }
+    },
+    {
+      path: "/settings",
+      redirect: "/records"
     }
   ]
 });

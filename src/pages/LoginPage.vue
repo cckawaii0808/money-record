@@ -31,27 +31,34 @@ async function handleLogin() {
 </script>
 
 <template>
-  <!-- 全螢幕置中背景 -->
-  <div class="login-bg">
-    <!-- 登入卡片 -->
-    <div class="login-card">
+  <main class="login-bg">
+    <section class="workspace-panel login-card" aria-labelledby="login-heading">
       <!-- Logo 圖示 -->
       <div class="login-logo">
-        <i class="pi pi-wallet login-logo-icon" />
+        <i class="pi pi-wallet login-logo-icon" aria-hidden="true" />
       </div>
 
       <!-- 標題 -->
-      <h1 class="login-title">資金記錄</h1>
-      <p class="login-subtitle">每月追蹤您的資產變化，掌握財富成長</p>
+      <p class="login-eyebrow">個人金融工作台</p>
+      <h1 id="login-heading" class="login-title">資金記錄</h1>
+      <p class="login-subtitle">整理每月帳戶餘額與投資持倉，<br />清楚掌握資產變化。</p>
+      <div class="login-features" aria-label="工作台功能">
+        <span><i class="pi pi-list" aria-hidden="true"></i>每月記錄</span>
+        <span><i class="pi pi-chart-line" aria-hidden="true"></i>投資追蹤</span>
+        <span><i class="pi pi-wallet" aria-hidden="true"></i>資產總覽</span>
+      </div>
 
       <!-- 錯誤訊息提示框 -->
-      <div v-if="errorMsg" class="login-error">
+      <div v-if="errorMsg" class="login-error" role="alert">
         {{ errorMsg }}
       </div>
 
       <!-- Google 登入按鈕 -->
       <button
         class="login-btn"
+        type="button"
+        aria-label="使用 Google 帳號登入資金記錄"
+        :aria-busy="loading"
         :class="{ 'login-btn--loading': loading }"
         :disabled="loading"
         @click="handleLogin"
@@ -63,6 +70,7 @@ async function handleLogin() {
           width="20"
           height="20"
           class="login-btn-icon"
+          aria-hidden="true"
         >
           <path
             fill="#EA4335"
@@ -82,14 +90,14 @@ async function handleLogin() {
           />
         </svg>
         <!-- 載入中旋轉圖示 -->
-        <i v-else class="pi pi-spin pi-spinner login-btn-icon" />
-        <span>使用 Google 帳號登入</span>
+        <i v-else class="pi pi-spin pi-spinner login-btn-icon" aria-hidden="true" />
+        <span aria-live="polite">{{ loading ? '登入中…' : '使用 Google 帳號登入' }}</span>
       </button>
 
       <!-- 版權 -->
       <p class="login-footer">© {{ new Date().getFullYear() }} MoneyRecord</p>
-    </div>
-  </div>
+    </section>
+  </main>
 </template>
 
 <style scoped>
@@ -106,46 +114,51 @@ async function handleLogin() {
 /* ===== 登入卡片 ===== */
 .login-card {
   width: 100%;
-  max-width: 360px;
+  max-width: 400px;
   background: var(--surface);
   border: 1px solid var(--line-soft);
-  border-radius: 20px;
-  padding: 40px 32px;
+  border-radius: 10px;
+  padding: 32px;
   text-align: center;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.025);
 }
 
 /* ===== Logo ===== */
 .login-logo {
-  width: 60px;
-  height: 60px;
-  background: var(--primary);
-  border-radius: 16px;
+  width: 40px;
+  height: 40px;
+  background: var(--primary-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 20px;
+  margin: 0 auto 18px;
 }
 
 .login-logo-icon {
-  font-size: 28px;
-  color: #fff;
+  font-size: 19px;
+  color: var(--primary);
 }
 
 /* ===== 標題文字 ===== */
 .login-title {
   margin: 0 0 8px;
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 650;
   color: var(--text-main);
 }
 
 .login-subtitle {
-  margin: 0 0 28px;
+  margin: 0 0 20px;
   font-size: 0.875rem;
   color: var(--text-sub);
-  line-height: 1.4;
+  line-height: 1.7;
 }
+
+.login-eyebrow { margin: 0 0 8px; font-size: 11px; color: var(--text-sub); letter-spacing: 0.08em; }
+.login-features { display: flex; justify-content: space-between; gap: 8px; padding: 14px 0; margin-bottom: 22px; border-block: 1px solid var(--line-soft); color: var(--text-sub); font-size: 11px; }
+.login-features span { display: flex; align-items: center; gap: 5px; }
 
 /* ===== 錯誤訊息 ===== */
 .login-error {
@@ -162,35 +175,31 @@ async function handleLogin() {
 /* ===== Google 登入按鈕 ===== */
 .login-btn {
   width: 100%;
-  height: 48px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-size: 15px;
-  font-weight: 600;
+  background: var(--surface);
+  color: var(--text-main);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
   transition:
     background 0.2s,
-    transform 0.1s,
     opacity 0.2s;
   font-family: inherit;
 }
 
 .login-btn:hover:not(:disabled) {
-  background: var(
-    --primary-hover,
-    color-mix(in srgb, var(--primary) 85%, black)
-  );
-  transform: translateY(-1px);
+  background: var(--app-bg);
 }
 
-.login-btn:active:not(:disabled) {
-  transform: translateY(0);
+.login-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
 }
 
 /* 載入中狀態 */
@@ -209,6 +218,7 @@ async function handleLogin() {
   margin: 24px 0 0;
   font-size: 12px;
   color: var(--text-sub);
-  opacity: 0.6;
 }
+
+@media (max-width: 400px) { .login-card { padding: 24px 20px; } }
 </style>

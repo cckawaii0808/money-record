@@ -50,27 +50,29 @@ function goNext() {
 
 <template>
   <div
-    class="inline-flex items-center bg-[var(--surface)] px-2 py-1.5 rounded-[20px] shadow-sm border border-[var(--line-soft)]"
+    class="inline-flex items-center bg-[var(--surface)] px-1 rounded-md border border-[var(--line-soft)]"
   >
     <Button
       icon="pi pi-chevron-left"
+      aria-label="上一個月"
       text
       rounded
       :disabled="!hasPrevious"
-      class="text-[var(--text-sub)] !p-2 h-10 w-10"
+      class="text-[var(--text-sub)] !p-2 !h-9 !w-9"
       @click="goPrevious"
     />
     <span
-      class="w-36 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums select-none"
+      class="w-24 text-center text-[15px] font-bold text-[var(--text-main)] tabular-nums select-none"
     >
       {{ modelValue }}
     </span>
     <Button
       icon="pi pi-chevron-right"
+      aria-label="下一個月"
       text
       rounded
       :disabled="!hasNext"
-      class="text-[var(--text-sub)] !p-2 h-10 w-10"
+      class="text-[var(--text-sub)] !p-2 !h-9 !w-9"
       @click="goNext"
     />
   </div>

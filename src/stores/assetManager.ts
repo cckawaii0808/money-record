@@ -15,6 +15,8 @@ import {
 } from "../utils/monthUtils";
 import { resolveBankIcon } from "../features/asset-manager/utils/bankIcons";
 import { isMockMode } from "../firebase";
+import { useAuth } from "../composables/useAuth";
+import { getLeaderboard, updateMyProfile, type LeaderboardData } from "../services/leaderboardApi";
 import { seedAccounts, seedRecords, seedInvestments } from "../data";
 import axios from "axios";
 import {
@@ -118,7 +120,101 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   const fxUpdatedAt = ref("");
   const fxSource = "open.er-api.com";
   let dataInitialized = false; // 是否已初始化資料
+  let dataInitializing = false;
+  let sessionSeq = 0;
+  const { user } = useAuth();
+  let activeUid: string | null = null;
   let investmentSnapshotsRequestSeq = 0;
+
+  const leaderboard = ref<LeaderboardData | null>(null);
+  const leaderboardLoading = ref(false);
+  const leaderboardError = ref("");
+  const leaderboardOffset = ref(0);
+  const leaderboardLimit = 20;
+  const myRank = computed(() => leaderboard.value?.myRank ?? null);
+  let leaderboardRequestSeq = 0;
+  // 成功同步的 UID 保留紀錄；失敗僅於下一次載入重試。
+  const profileRequests = new Map<string, Promise<void>>();
+  const profileDisplayNames = new Map<string, string>();
+
+  function syncLeaderboardProfile(uid: string): Promise<void> | undefined {
+    if (isMockMode) return;
+    const existing = profileRequests.get(uid);
+    if (existing) return existing;
+    const name = profileDisplayNames.get(uid);
+    if (!name) return;
+    let sent = false;
+    const request = Promise.resolve().then(() => {
+      if (uid !== activeUid) return;
+      sent = true;
+      return updateMyProfile(name);
+    }).then(() => {
+      // 尚未送出就切換 UID，不能視為已成功同步。
+      if (!sent && profileRequests.get(uid) === request) profileRequests.delete(uid);
+    }).catch((error) => {
+      if (profileRequests.get(uid) === request) profileRequests.delete(uid);
+      console.warn("排行榜暱稱同步失敗，仍會載入排行榜：", error);
+    });
+    profileRequests.set(uid, request);
+    return request;
+  }
+
+  function resetSession(uid: string | null) {
+    activeUid = uid;
+    sessionSeq++;
+    investmentSnapshotsRequestSeq++;
+    leaderboardRequestSeq++;
+    accounts.value = [];
+    records.value = [];
+    holdings.value = [];
+    investmentSnapshots.value = [];
+    selectedAccountIds.value = [];
+    selectedMonth.value = getCurrentMonth();
+    rangeStartMonth.value = EARLIEST_SELECTABLE_MONTH;
+    rangeEndMonth.value = getCurrentMonth();
+    newAccount.value = { name: "", category: "", type: "asset", currency: "TWD" };
+    dataInitialized = false;
+    dataInitializing = false;
+    isLoading.value = false;
+    leaderboard.value = null;
+    leaderboardError.value = "";
+    leaderboardLoading.value = false;
+    leaderboardOffset.value = 0;
+  }
+
+  async function initializeLeaderboard(uid: string | null, displayName?: string | null) {
+    if (!activeUid || (!isMockMode && uid !== activeUid)) return;
+    if (!isMockMode && uid) {
+      const name = (displayName?.trim() || "使用者").slice(0, 50).trim();
+      profileDisplayNames.set(uid, name);
+    }
+    await fetchLeaderboard(0);
+  }
+
+  async function fetchLeaderboard(offset = leaderboardOffset.value) {
+    const uid = activeUid;
+    if (!uid) return;
+    const requestSeq = ++leaderboardRequestSeq;
+    leaderboardLoading.value = true;
+    leaderboardError.value = "";
+    try {
+      await syncLeaderboardProfile(uid);
+      if (requestSeq !== leaderboardRequestSeq || uid !== activeUid) return;
+      const data: LeaderboardData = isMockMode ? {
+        entries: [{ rank: 1, publicId: "local-demo", displayName: "示範使用者", netWorthTwd: 123456.78, updatedAt: null, isCurrentUser: true }],
+        totalUsers: 1, myRank: 1, balanceMonth: getCurrentMonth(), generatedAt: "本地示範資料",
+        fx: { USD: 0, JPY: 0, updatedAt: null, isStale: true },
+      } : await getLeaderboard(leaderboardLimit, offset);
+      if (requestSeq !== leaderboardRequestSeq || uid !== activeUid) return;
+      leaderboard.value = data;
+      leaderboardOffset.value = offset;
+    } catch (error) {
+      if (requestSeq !== leaderboardRequestSeq || uid !== activeUid) return;
+      leaderboardError.value = error instanceof Error ? error.message : "無法載入排行榜，請稍後重試。";
+    } finally {
+      if (requestSeq === leaderboardRequestSeq) leaderboardLoading.value = false;
+    }
+  }
 
   const currentMonth = ref(getCurrentMonth());
 
@@ -298,57 +394,73 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   }
 
   /** 從 Worker API 讀取帳戶列表 */
-  async function fetchAccounts() {
+  async function fetchAccounts(): Promise<boolean> {
+    const seq = sessionSeq;
     if (isMockMode) {
       accounts.value = seedAccounts;
       // 更新選取的帳戶列表，預設全選
       if (selectedAccountIds.value.length === 0) {
         selectedAccountIds.value = accounts.value.map(a => a.id);
       }
-      return;
+      return true;
     }
 
     try {
-      accounts.value = await apiGetAccounts();
+      const data = await apiGetAccounts();
+      if (seq !== sessionSeq) return false;
+      accounts.value = data;
       // 更新選取的帳戶列表，預設全選
       if (selectedAccountIds.value.length === 0) {
         selectedAccountIds.value = accounts.value.map(a => a.id);
       }
+      return true;
     } catch (error) {
       console.error("Error fetching accounts:", error);
+      return false;
     }
   }
 
   /** 從 Worker API 讀取每月紀錄 */
-  async function fetchRecords() {
+  async function fetchRecords(): Promise<boolean> {
+    const seq = sessionSeq;
     if (isMockMode) {
       records.value = seedRecords;
-      return;
+      return true;
     }
 
     try {
-      records.value = await apiGetMonthlyRecords();
+      const data = await apiGetMonthlyRecords();
+      if (seq !== sessionSeq) return false;
+      records.value = data;
+      return true;
     } catch (error) {
       console.error("Error fetching records:", error);
+      return false;
     }
   }
 
   /** 從 Worker API 讀取投資部位 */
-  async function fetchHoldings() {
+  async function fetchHoldings(): Promise<boolean> {
+    const seq = sessionSeq;
     if (isMockMode) {
       holdings.value = seedInvestments.map(h => ({ ...h })) as Holding[];
-      return;
+      return true;
     }
 
     try {
-      holdings.value = await apiGetHoldings();
+      const data = await apiGetHoldings();
+      if (seq !== sessionSeq) return false;
+      holdings.value = data;
+      return true;
     } catch (error) {
       console.error("Error fetching holdings:", error);
+      return false;
     }
   }
 
   /** 新增投資部位 */
   async function addHolding(payload: Omit<Holding, "id">): Promise<ActionResult> {
+    const seq = sessionSeq;
     if (isMockMode) {
       holdings.value.push({ ...payload, id: Date.now() });
       return { type: "success", message: "已新增部位。" };
@@ -363,6 +475,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
         avg_cost: payload.avgCost,
         currency: payload.currency
       });
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
       holdings.value.push(newHolding);
       return { type: "success", message: "已新增部位。" };
     } catch (error: any) {
@@ -372,6 +485,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
   /** 更新投資部位 */
   async function updateHolding(id: number, updates: Partial<Omit<Holding, "id">>): Promise<ActionResult> {
+    const seq = sessionSeq;
     if (isMockMode) {
       const idx = holdings.value.findIndex(h => h.id === id);
       if (idx !== -1) holdings.value[idx] = { ...holdings.value[idx], ...updates };
@@ -383,6 +497,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
         quantity: updates.quantity,
         avg_cost: updates.avgCost
       });
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
       const idx = holdings.value.findIndex(h => h.id === id);
       if (idx !== -1) holdings.value[idx] = updated;
       return { type: "success", message: "已更新部位。" };
@@ -393,6 +508,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
   /** 刪除投資部位 */
   async function deleteHolding(id: number): Promise<ActionResult> {
+    const seq = sessionSeq;
     if (isMockMode) {
       holdings.value = holdings.value.filter(h => h.id !== id);
       return { type: "success", message: "已刪除部位。" };
@@ -400,6 +516,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
     try {
       const data = await apiDeleteHolding(id);
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
       holdings.value = data;
       return { type: "success", message: "已刪除部位。" };
     } catch (error: any) {
@@ -409,6 +526,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
   /** 觸發每日快照（記錄今日持倉市值） */
   async function takeSnapshot(): Promise<ActionResult> {
+    const seq = sessionSeq;
     if (isMockMode) {
       recordCurrentInvestmentSnapshot();
       return { type: "success", message: "快照建立成功 (mock)。" };
@@ -416,6 +534,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
     try {
       const result = await apiTakeSnapshot();
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
       // 先即時把本次更新反映到畫面；後續再由 API 歷史資料覆蓋。
       recordCurrentInvestmentSnapshot();
       return { type: "success", message: `已建立 ${result.date} 的快照，共 ${result.snapshotCount} 筆。` };
@@ -511,15 +630,27 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
   /** 初始化資料 (應用程式啟動時呼叫) */
   async function initData() {
-    if (dataInitialized) return;
+    if (!activeUid || dataInitialized || dataInitializing) return;
+    const seq = sessionSeq;
+    dataInitializing = true;
     isLoading.value = true;
-    await Promise.all([fetchAccounts(), fetchRecords(), fetchHoldings(), refreshFxRates()]);
-    isLoading.value = false;
-    dataInitialized = true;
+    try {
+      const [accountsLoaded, recordsLoaded, holdingsLoaded] = await Promise.all([
+        fetchAccounts(), fetchRecords(), fetchHoldings(), refreshFxRates(),
+      ]);
+      if (seq !== sessionSeq) return;
+      dataInitialized = accountsLoaded && recordsLoaded && holdingsLoaded;
+    } finally {
+      if (seq === sessionSeq) {
+        isLoading.value = false;
+        dataInitializing = false;
+      }
+    }
   }
 
   /** 更新匯率 (從外部 API) */
   async function refreshFxRates(): Promise<ActionResult> {
+    if (isMockMode) return { type: "success", message: "本地示範使用固定匯率。" };
     if (fxLoading.value) {
       return { type: "error", message: "匯率更新中，請稍候" };
     }
@@ -782,6 +913,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
   /** 新增帳戶到 Worker API */
   async function addAccount(): Promise<ActionResult> {
+    const seq = sessionSeq;
     if (!newAccount.value.name.trim()) {
       return { type: "error", message: "請先填入帳戶名稱。" };
     }
@@ -799,6 +931,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
         type: newAccount.value.type,
         sort_order: maxSortOrder + 1,
       });
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
       
       // 更新本地狀態
       accounts.value.push(payload);
@@ -825,6 +958,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       amount: number;
     }>
   ): Promise<ActionResult> {
+    const seq = sessionSeq;
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
       return { type: "error", message: "月份格式錯誤，請用 YYYY-MM。" };
     }
@@ -835,6 +969,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     
     try {
       const result = await apiBulkUpsertMonthlyRecords(month, entries);
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
       records.value = result.data;
 
       selectedMonth.value = clampMonth(month);
@@ -856,6 +991,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
   /** 更新帳戶資訊到 Worker API */
   async function updateAccountById(accountId: string, updates: Partial<Pick<Account, "name" | "category" | "currency">>): Promise<ActionResult> {
+    const seq = sessionSeq;
     const account = accounts.value.find((item) => item.id === accountId);
     if (!account) {
       return { type: "error", message: "找不到帳戶。" };
@@ -866,6 +1002,7 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
       if (updates.category !== undefined) payload.category = updates.category.trim();
       if (updates.currency !== undefined) payload.currency = updates.currency;
       const updated = await apiUpdateAccount(accountId, payload);
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
 
       // 更新本地狀態
       const index = accounts.value.findIndex((item) => item.id === accountId);
@@ -931,12 +1068,15 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
 
   /** 刪除帳戶及其相關紀錄 */
   async function deleteAccount(accountId: string): Promise<ActionResult> {
+    const seq = sessionSeq;
     const account = accounts.value.find((item) => item.id === accountId);
     if (!account) {
       return { type: "error", message: "找不到要刪除的帳戶。" };
     }
     try {
-      accounts.value = await apiDeleteAccount(accountId);
+      const data = await apiDeleteAccount(accountId);
+      if (seq !== sessionSeq) return { type: "error", message: "帳戶已切換，已忽略舊請求結果。" };
+      accounts.value = data;
       selectedAccountIds.value = selectedAccountIds.value.filter((id) => id !== accountId);
       records.value = records.value.filter((r) => r.accountId !== accountId);
 
@@ -946,12 +1086,21 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
     }
   }
 
-  // 自動初始化資料
-  if (!dataInitialized) {
-    void initData();
-  }
+  // 所有頁面共用 UID 切換清理，包含 Dashboard 未掛載時的登出。
+  watch(() => isMockMode ? "local-demo" : user.value?.uid ?? null, (uid) => {
+    resetSession(uid);
+    if (uid) void initData();
+  }, { immediate: true, flush: "sync" });
 
   return {
+    leaderboard,
+    leaderboardLoading,
+    leaderboardError,
+    leaderboardOffset,
+    leaderboardLimit,
+    myRank,
+    initializeLeaderboard,
+    fetchLeaderboard,
     accounts,
     records,
     holdings,

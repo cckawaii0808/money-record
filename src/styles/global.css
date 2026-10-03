@@ -13,7 +13,7 @@ html {
 body {
   margin: 0;
   /* DM Sans：現代幾何無襯線，适合 SaaS 儀表板 */
-  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
   background: var(--app-bg);
   color: var(--text-main);
   min-height: 100dvh;
@@ -73,23 +73,70 @@ h1, h2, h3, h4, h5, h6 {
 .apollo-card {
   background: var(--surface);
   border: 1px solid var(--line-soft);
-  border-radius: 1.25rem;
+  border-radius: 10px;
   box-shadow: var(--card-shadow);
   padding: 1.25rem; /* 適中的 Padding，避免電腦版看起來過於巨大 */
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .apollo-card:hover {
-  box-shadow: 0 10px 25px rgba(0,0,0,0.06), 0 2px 5px rgba(0,0,0,0.04);
+  box-shadow: none;
   /* 移除預設的大幅度浮起，Apollo UI 更平穩 */
 }
 
 @media (max-width: 639px) {
   .apollo-card {
-    border-radius: 1.5rem;
-    padding: 1.5rem 1.25rem;
-    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.04);
+    border-radius: 10px;
+    padding: 1rem;
+    box-shadow: none;
   }
+}
+
+/* 共用工作台框架 */
+button, input, select, textarea { font-family: inherit; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.workspace-page { max-width: 1280px; margin-inline: auto; padding: 28px 24px 40px; }
+.workspace-panel { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; box-shadow: none; min-width: 0; }
+.section-heading { font-size: 16px; font-weight: 650; color: var(--text-main); }
+.muted-label { color: var(--text-sub); }
+.currency-badge { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 4px; background: var(--app-bg); color: var(--text-sub); font-size: 12px; font-weight: 600; }
+.toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.segmented-control { display: inline-flex; gap: 3px; padding: 3px; background: var(--app-bg); border: 1px solid var(--line-soft); border-radius: 7px; }
+.segmented-control button { padding: 6px 10px; border: 0; border-radius: 4px; background: transparent; color: var(--text-sub); font-size: 13px; cursor: pointer; }
+.segmented-control button[aria-pressed="true"], .segmented-control button.active { background: var(--surface); color: var(--primary); }
+.data-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.data-table th { text-align: left; color: var(--text-sub); font-weight: 600; }
+.p-button { --p-button-primary-background: var(--primary); --p-button-primary-border-color: var(--primary); --p-button-primary-hover-background: var(--primary-hover); --p-button-primary-hover-border-color: var(--primary-hover); --p-button-border-radius: 6px; }
+.workspace-header .p-button { min-height: 38px; white-space: nowrap; }
+.app-shell { min-height: 100dvh; }
+.app-topbar { position: sticky; top: 0; z-index: 60; background: var(--surface-elev); border-bottom: 1px solid var(--line-soft); }
+.app-topbar__inner { max-width: 1440px; margin: auto; min-height: 68px; display: flex; align-items: center; gap: 36px; padding: 0 28px; }
+.app-brand { display: inline-flex; gap: 10px; align-items: center; color: var(--text-main); font-size: 18px; font-weight: 750; text-decoration: none; white-space: nowrap; letter-spacing: -.5px; }
+.app-brand__mark { width: 32px; height: 32px; display: grid; place-items: center; background: var(--primary); color: var(--surface); border-radius: 8px; }
+.app-brand__secondary { font-weight: 450; color: var(--text-sub); }
+.app-navigation { display: flex; align-items: stretch; gap: 6px; align-self: stretch; }
+.app-navigation a { display: flex; align-items: center; gap: 8px; padding: 0 14px; position: relative; text-decoration: none; color: var(--text-sub); font-size: 15px; font-weight: 550; white-space: nowrap; }
+.app-navigation a:hover { color: var(--primary); background: var(--primary-soft); }
+.app-navigation a.active { color: var(--primary); }
+.app-navigation a.active::after { content: ''; position: absolute; height: 3px; bottom: 0; inset-inline: 14px; background: var(--primary); border-radius: 3px 3px 0 0; }
+.app-user-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.icon-control, .profile-control { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: var(--text-sub); border: 0; border-radius: 6px; padding: 8px; cursor: pointer; }
+.icon-control:hover, .profile-control:hover { background: var(--app-bg); }
+.profile-control img, .profile-initial { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.profile-initial { display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); }
+.profile-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.profile-menu { display: flex; flex-direction: column; gap: 8px; max-width: 280px; padding: 8px; overflow-wrap: anywhere; }
+.profile-menu button { display: flex; align-items: center; gap: 10px; border: 0; padding: 10px; background: transparent; color: var(--text-main); cursor: pointer; text-align: left; border-radius: 6px; }
+.profile-menu button:hover { background: var(--app-bg); }
+@media (max-width: 900px) { .app-topbar__inner { gap: 16px; padding-inline: 18px; } .profile-name { display: none; } .app-navigation a { padding-inline: 10px; } }
+@media (max-width: 640px) {
+  .workspace-page { padding: 20px 14px 80px; }
+  .app-topbar__inner { flex-wrap: wrap; gap: 0; padding: 10px 14px 0; }
+  .app-brand { font-size: 17px; }
+  .app-navigation { order: 3; width: 100%; margin-top: 8px; justify-content: space-between; }
+  .app-navigation a { padding: 12px 5px; font-size: 13px; gap: 5px; }
+  .app-navigation a.active::after { inset-inline: 5px; }
+  .app-user-actions { margin-left: auto; }
 }
 
 /* --- 精緻極簡 Toast 提示框樣式調整 --- */

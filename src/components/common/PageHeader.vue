@@ -1,59 +1,18 @@
 <script setup lang="ts">
-/**
- * PageHeader — 統一的頁面標題區塊
- *
- * 桌面版透過 Teleport 到 App.vue 的 #app-header-slot
- * 手機版顯示為 sticky 標題
- *
- * Props:
- *   title     - 頁面標題
- *   isDesktop - 是否為桌面版
- *   slotName  - Teleport target（預設 "#app-header-slot"）
- *
- * Slots:
- *   default   - 標題右側的控制項（月份導航、按鈕等）
- *   extra     - 標題左側額外控制（可選）
- */
-import { Teleport } from "vue";
-
-const props = withDefaults(
-  defineProps<{
-    title: string;
-    isDesktop: boolean;
-    slotName?: string;
-  }>(),
-  {
-    slotName: "#app-header-slot",
-  }
-);
+defineProps<{ title: string; subtitle?: string; isDesktop?: boolean; slotName?: string }>();
 </script>
 
 <template>
-  <Teleport defer :to="slotName" :disabled="!isDesktop">
-    <div
-      :class="
-        isDesktop
-          ? 'grid grid-cols-3 items-center w-full'
-          : 'block text-center mb-6 sticky top-0 z-[50] bg-[var(--app-bg)]/95 backdrop-blur-md py-3 -mx-4 px-4'
-      "
-    >
-      <!-- 標題（桌面版顯示） -->
-      <h1
-        v-if="isDesktop"
-        class="text-2xl font-bold text-[var(--text-main)] m-0"
-      >
-        {{ title }}
-      </h1>
-      <div
-        :class="
-          isDesktop ? 'flex justify-center' : 'w-full flex justify-center'
-        "
-      >
-        <slot />
-      </div>
-      <div v-if="isDesktop" class="flex justify-end gap-2 pr-2">
-        <slot name="extra" />
-      </div>
-    </div>
-  </Teleport>
+  <header class="page-intro workspace-header">
+    <div class="workspace-header__copy"><h1>{{ title }}</h1><p v-if="subtitle" class="muted-label">{{ subtitle }}</p></div>
+    <div class="workspace-header__controls"><slot /><slot name="extra" /></div>
+  </header>
 </template>
+
+<style scoped>
+.workspace-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.workspace-header__copy h1 { font-size: 26px; font-weight: 700; letter-spacing: -.03em; }
+.workspace-header__copy p { margin: 6px 0 0; font-size: 14px; }
+.workspace-header__controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 640px) { .workspace-header__copy h1 { font-size: 23px; } .workspace-header__controls { width: 100%; justify-content: space-between; } }
+</style>

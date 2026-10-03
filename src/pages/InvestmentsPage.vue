@@ -11,6 +11,7 @@ import Select from "primevue/select";
 import { useToast } from "primevue/usetoast";
 import { useConfirm } from "primevue/useconfirm";
 import InvestmentTrendChart from "../components/investments/InvestmentTrendChart.vue";
+import PageHeader from "../components/common/PageHeader.vue";
 import type { Holding } from "../types";
 import type { Currency } from "../types";
 import { useAssetManagerStore } from "../stores/assetManager";
@@ -92,13 +93,8 @@ const fmt = (v: number, curr = "TWD") =>
     maximumFractionDigits: curr === "TWD" ? 0 : 2,
   }).format(v);
 
-const fmtCompact = (v: number, curr = "TWD") =>
-  new Intl.NumberFormat(curr === "TWD" ? "zh-TW" : "en-US", {
-    style: "currency",
-    currency: curr,
-    notation: "compact",
-    maximumFractionDigits: curr === "TWD" ? 1 : 2,
-  }).format(v);
+const fmtSigned = (v: number, curr = "TWD") =>
+  `${v > 0 ? "+" : ""}${fmt(v, curr)}`;
 
 const fmtSymbol = (sym: string) => sym.replace(/\.(TW|TWO)$/i, "");
 
@@ -304,7 +300,6 @@ async function refreshPrices() {
       const result = await store.takeSnapshot();
       if (result.type === "success") {
         await loadInvestmentTrend(trendRange.value, true);
-        toast.add({ severity: "success", summary: "報價更新成功", detail: `已取得最新報價，並建立本次股票資產快照。`, life: 3000 });
       } else {
         toast.add({ severity: "error", summary: "紀錄錯誤", detail: result.message, life: 3000 });
       }
@@ -425,108 +420,87 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-28 relative">
-    <!-- ─── Header ─── -->
-    <Teleport defer to="#app-header-slot" :disabled="!isDesktop">
-      <div
-        class="flex items-center justify-between w-full mb-4 px-2"
-      >
-        <!-- 標題 -->
-        <h1 class="text-xl md:text-2xl font-bold text-[var(--text-main)] m-0">投資組合</h1>
+  <div class="workspace-page investments-page">
+    <PageHeader title="投資組合">
+        <Button :label="isDesktop ? '更新報價' : ''" aria-label="更新投資報價並建立快照" icon="pi pi-sync" severity="secondary" outlined size="small" :loading="isRefreshingAll" @click="refreshPrices" />
+        <Button :label="isDesktop ? '同步帳戶' : ''" aria-label="同步投資市值至本月帳戶" icon="pi pi-cloud-upload" severity="secondary" outlined size="small" @click="openSync" />
+    </PageHeader>
 
-        <!-- 操作區 -->
-        <div class="flex items-center gap-2 md:gap-3">
-          <!-- 報價與同步：電腦版帶文字，手機版僅 Icon -->
-          <Button :label="isDesktop ? '更新報價' : ''" icon="pi pi-sync" severity="secondary" rounded :text="isDesktop" :outlined="!isDesktop" size="small" :loading="isRefreshingAll" @click="refreshPrices" :class="isDesktop ? '!px-3 font-bold' : 'w-9 h-9 p-0 bg-white shadow-sm border-[var(--line-soft)]'" />
-          <Button :label="isDesktop ? '同步帳戶' : ''" icon="pi pi-cloud-upload" severity="secondary" rounded :text="isDesktop" :outlined="!isDesktop" size="small" @click="openSync" :class="isDesktop ? '!px-3 font-bold' : 'w-9 h-9 p-0 bg-white shadow-sm border-[var(--line-soft)]'" />
-        </div>
+    <section class="workspace-panel portfolio-overview" aria-label="投資總覽">
+      <div>
+        <div class="muted-label">總市值 <span class="currency-badge">TWD</span></div>
+        <div class="portfolio-total">{{ fmt(totalTwd) }}</div>
+        <div class="muted-label">{{ store.holdings.length }} 檔持倉・依目前匯率折算</div>
       </div>
-    </Teleport>
-
-    <!-- ─── 總覽區 ─── -->
-    <section class="mb-6">
-      <div class="flex items-end justify-between">
-        <div class="min-w-0">
-          <div class="text-[13px] font-bold text-[var(--text-sub)] mb-1">總市值 (TWD)</div>
-          <div class="text-[28px] sm:text-[32px] leading-tight font-black tabular-nums tracking-tight text-[var(--text-main)] truncate">
-            {{ fmt(totalTwd, "TWD") }}
-          </div>
-        </div>
-        <div class="text-right shrink-0 ml-4">
-          <div class="text-[13px] font-bold text-[var(--text-sub)] mb-1">總損益</div>
-          <div class="text-[18px] sm:text-[20px] font-black tabular-nums leading-tight" :class="totalPnlTwd >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'">
-            {{ totalPnlTwd >= 0 ? "+" : "" }}{{ fmtCompact(totalPnlTwd, "TWD") }}
-          </div>
-          <div class="text-[12px] font-bold" :class="totalPnlTwd >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'">
-            {{ totalPnlRate >= 0 ? "+" : "" }}{{ totalPnlRate.toFixed(1) }}%
-          </div>
-        </div>
+      <div>
+        <div class="muted-label">總投入成本（TWD）</div>
+        <div class="portfolio-number">{{ fmt(totalCostTwd) }}</div>
+      </div>
+      <div>
+        <div class="muted-label">未實現損益（TWD）</div>
+        <div class="portfolio-number" :class="totalPnlTwd >= 0 ? 'pnl-positive' : 'pnl-negative'">{{ fmtSigned(totalPnlTwd) }}</div>
+        <div class="text-xs tabular-nums" :class="totalPnlTwd >= 0 ? 'pnl-positive' : 'pnl-negative'">{{ totalPnlRate > 0 ? '+' : '' }}{{ totalPnlRate.toFixed(1) }}%</div>
       </div>
     </section>
 
-    <!-- ─── 個股列表 ─── -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-      <section v-for="g in [
-        { key: 'TW', title: '台股', color: 'bg-blue-500', list: twItems },
-        { key: 'US', title: '美股', color: 'bg-purple-500', list: usItems },
-      ]" :key="g.key">
-        <div class="flex items-center justify-between gap-3 mb-3">
-          <div class="flex items-center gap-2 min-w-0">
-            <div class="w-1.5 h-5 rounded-full" :class="g.color"></div>
-            <h2 class="text-lg font-black text-[var(--text-main)] truncate">{{ g.title }}（{{ g.key }}）</h2>
+    <div class="holdings-toolbar">
+      <span class="section-heading">持倉明細</span>
+      <div class="currency-switch" role="group" aria-label="持倉金額顯示幣別">
+        <button type="button" :aria-pressed="displayCurrency === 'native'" @click="displayCurrency = 'native'">原幣</button>
+        <button type="button" :aria-pressed="displayCurrency === 'twd'" @click="displayCurrency = 'twd'">折台幣</button>
+      </div>
+    </div>
+
+    <div class="holdings-grid">
+      <section v-for="g in summaries" :key="g.market" class="workspace-panel holdings-panel" :aria-label="`${g.label}持倉`">
+        <div class="market-heading">
+          <div>
+            <h2 class="section-heading">{{ g.label }} <span class="currency-badge">{{ g.currency }}</span></h2>
+            <p class="muted-label">{{ g.count }} 檔・配置 {{ g.allocation.toFixed(1) }}%</p>
           </div>
-          <div class="flex items-center gap-2.5 shrink-0">
-            <span class="text-xs font-bold text-[var(--text-sub)]">{{ g.list.length }} 檔</span>
-            <Button 
-              label="新增" 
-              icon="pi pi-plus" 
-              size="small" 
-              class="!py-1 !px-2.5 !text-[12px] !rounded-lg bg-[var(--primary-soft)] hover:bg-[var(--primary-soft-hover)] text-[var(--primary)] border-none font-bold" 
-              @click="openAdd(g.key as 'TW' | 'US')" 
-            />
-          </div>
+          <Button label="新增" :aria-label="`新增${g.label}投資`" icon="pi pi-plus" size="small" severity="secondary" outlined @click="openAdd(g.market as 'TW' | 'US')" />
         </div>
-
-        <div v-if="!g.list.length" class="text-center text-sm text-[var(--text-sub)] py-6 border border-dashed border-[var(--line-soft)] rounded-xl">
-          尚無{{ g.title }}標的
+        <div class="market-total">
+          <strong>{{ fmt(displayCurrency === 'twd' ? g.twdValue : g.nativeValue, displayCurrency === 'twd' ? 'TWD' : g.currency) }}</strong>
+          <span class="muted-label">{{ displayCurrency === 'twd' ? '折台幣市值' : '原幣市值' }}</span>
         </div>
-
-        <div v-else class="apollo-card !p-0 overflow-hidden flex flex-col">
-          <article v-for="h in g.list" :key="h.id" 
-                   class="flex items-center justify-between py-3 px-3 sm:px-4 border-b border-[var(--line-soft)] last:border-none cursor-pointer hover:bg-[var(--app-bg)] transition-colors"
-                   @click="openEdit(h)">
-            
-            <!-- 左側：代號 Tag + 股票名稱，下方股數 -->
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="flex flex-col min-w-0">
-                <div class="flex items-center gap-2 min-w-0">
-                  <Tag 
-                    :value="g.key === 'TW' ? fmtSymbol(h.symbol) : h.symbol" 
-                    severity="secondary" 
-                    class="!text-[11px] !py-0.5 !px-1.5 font-mono shrink-0 !rounded-md" 
-                  />
-                  <span class="text-[13px] font-bold text-[var(--text-main)] truncate min-w-0">
-                    {{ h.name || h.symbol }}
-                  </span>
-                </div>
-                <!-- 股數 -->
-                <span class="text-[12px] font-semibold text-[var(--text-muted)] mt-1 ml-0.5">
-                  {{ h.quantity }} 股
-                </span>
-              </div>
-            </div>
-
-            <!-- 右側：市值與損益 -->
-            <div class="flex flex-col items-end shrink-0 ml-2">
-              <span class="text-[15px] font-black tabular-nums text-[var(--text-main)] leading-tight">
-                {{ displayAmount(h).amount >= 0 ? "" : "-" }}{{ fmt(Math.abs(displayAmount(h).amount), displayAmount(h).currency) }}
-              </span>
-              <div class="flex items-center gap-1 mt-0.5 text-[12px] font-bold tabular-nums" :class="calcPnl(h) >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'">
-                <span>{{ displayPnl(h).amount >= 0 ? "+" : "" }}{{ fmt(Math.abs(displayPnl(h).amount), displayPnl(h).currency) }}</span>
-                <span>({{ calcPnlRate(h) >= 0 ? "+" : "" }}{{ calcPnlRate(h).toFixed(1) }}%)</span>
-              </div>
-            </div>
-          </article>
+        <div v-if="!g.count" class="holdings-empty">
+          <p>尚無{{ g.label }}標的</p>
+          <span class="muted-label">新增持倉後即可追蹤市值與損益。</span>
+        </div>
+        <div v-else class="holdings-table-wrap" tabindex="0" :aria-label="`${g.label}持倉表格，可橫向捲動`">
+          <table class="data-table holdings-table">
+            <caption class="sr-only">{{ g.label }}持倉；市值與損益以{{ displayCurrency === 'twd' ? '台幣' : '原幣' }}顯示</caption>
+            <thead><tr><th scope="col">標的／股數</th><th scope="col">市值／損益</th><th scope="col">操作</th></tr></thead>
+            <tbody>
+              <tr v-for="h in (g.market === 'TW' ? twItems : usItems)" :key="h.id">
+                <td>
+                  <button type="button" class="holding-name" :aria-label="`編輯 ${h.name || h.symbol} 投資`" @click="openEdit(h)">
+                    <span class="holding-symbol">{{ fmtSymbol(h.symbol) }}</span>
+                    <span>{{ h.name || h.symbol }}</span>
+                  </button>
+                  <div class="holding-detail">{{ h.quantity.toLocaleString('zh-TW') }} 股・{{ h.currency }}</div>
+                  <div class="holding-detail">成本 {{ fmt(h.avgCost, h.currency) }}／市價 {{ h.currentPrice === null ? '—' : fmt(h.currentPrice, h.currency) }}</div>
+                </td>
+                <td class="holding-value">
+                  <strong>{{ fmt(displayAmount(h).amount, displayAmount(h).currency) }}</strong>
+                  <div v-if="displayAmount(h).showTwdSub" class="holding-detail">
+                    {{ displayCurrency === 'twd' ? `原幣 ${h.currency} ${fmt(h.marketValue, h.currency)}` : `約 TWD ${fmt(displayAmount(h).twdAmount)}` }}
+                  </div>
+                  <div :class="calcPnl(h) >= 0 ? 'pnl-positive' : 'pnl-negative'">
+                    {{ fmtSigned(displayPnl(h).amount, displayPnl(h).currency) }}
+                    <span class="holding-rate">{{ h.gainLossPct === null ? '—' : `${calcPnlRate(h) > 0 ? '+' : ''}${calcPnlRate(h).toFixed(1)}%` }}</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="flex gap-1">
+                    <Button icon="pi pi-pencil" :aria-label="`編輯 ${h.name || h.symbol} 投資`" severity="secondary" text size="small" @click="openEdit(h)" />
+                    <Button icon="pi pi-trash" :aria-label="`刪除 ${h.name || h.symbol} 投資`" severity="danger" text size="small" @click="confirmDeleteInvest(h)" />
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
@@ -540,20 +514,24 @@ onMounted(() => {
 
     <!-- ─── 新增/編輯 Dialog ─── -->
     <Dialog v-model:visible="editVisible" :header="isEditing ? '編輯投資' : (editForm.market === 'TW' ? '新增台股' : '新增美股')" modal :draggable="false" :style="{ width: '90vw', maxWidth: '400px' }">
-      <div class="flex flex-col gap-5 pt-4">
+      <div class="investment-form flex flex-col gap-4 pt-2">
+        <div v-if="!isEditing" class="flex flex-col gap-1.5">
+          <label for="holding-market" class="muted-label">投資市場</label>
+          <Select inputId="holding-market" v-model="editForm.market" :options="marketOptions" optionLabel="label" optionValue="value" @change="onMarketChange" />
+        </div>
         <!-- 股票搜尋 -->
         <div class="flex flex-col gap-1.5 relative">
-          <label class="text-[13px] font-bold text-[var(--text-sub)]">股票名稱或代號</label>
+          <label for="holding-symbol" class="text-[13px] font-bold text-[var(--text-sub)]">股票名稱或代號</label>
           <div class="relative w-full">
-            <div v-if="selectedCode" class="flex items-center gap-2 px-3 h-10 border border-[var(--line-soft)] rounded-lg bg-white min-w-0">
+            <div v-if="selectedCode" class="flex items-center gap-2 px-3 h-10 border border-[var(--line-soft)] rounded-lg bg-[var(--surface)] min-w-0">
               <Tag :value="selectedCode" severity="secondary" class="!text-[11px] !py-0.5 !px-1.5 font-mono shrink-0" />
-              <span class="text-sm font-bold text-slate-700 truncate flex-1 min-w-0">{{ selectedName }}</span>
-              <button type="button" class="shrink-0 text-gray-400 hover:text-gray-600 leading-none" @click="editForm.symbol = ''">
+              <span class="text-sm font-semibold text-[var(--text-main)] truncate flex-1 min-w-0">{{ selectedName }}</span>
+              <button type="button" aria-label="清除已選股票，重新搜尋" class="shrink-0 text-[var(--text-sub)] leading-none" @click="editForm.symbol = ''">
                 <i class="pi pi-times text-xs"></i>
               </button>
             </div>
-            <AutoComplete v-else v-model="editForm.symbol" :suggestions="searchResults" @complete="onSearchStock" @item-select="onSymbolSelect"
-              :optionLabel="(item) => `${item.code} ${item.name}`" placeholder="e.g. AAPL / 0050 / 台積電"
+            <AutoComplete v-else inputId="holding-symbol" v-model="editForm.symbol" :suggestions="searchResults" @complete="onSearchStock" @item-select="onSymbolSelect"
+              :optionLabel="(item) => `${item.code ?? fmtSymbol(item.symbol)} ${item.name}`" placeholder="例如：AAPL／0050／台積電"
               inputClass="w-full !rounded-lg pr-8" class="w-full" appendTo="body"
               :pt="{ panel: { class: 'w-full !max-w-[360px] overflow-hidden' } }" emptyMessage="找不到符合的項目">
               <template #option="slotProps">
@@ -562,7 +540,7 @@ onMounted(() => {
                     <div class="w-14 shrink-0 flex justify-center">
                       <Tag :value="slotProps.option.code" severity="secondary" class="!text-[11px] !py-0.5 !px-1.5 font-mono w-full text-center" />
                     </div>
-                    <span class="text-sm font-bold text-slate-700 truncate min-w-0">{{ slotProps.option.name }}</span>
+                    <span class="text-sm font-semibold text-[var(--text-main)] truncate min-w-0">{{ slotProps.option.name }}</span>
                   </div>
                   <div class="flex items-center gap-1">
                     <Tag v-if="slotProps.option.exch === 'TAI'" value="上市" severity="info" rounded class="!text-[10px] !py-0 !px-1.5" />
@@ -578,14 +556,14 @@ onMounted(() => {
 
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-[13px] font-bold text-[var(--text-sub)]">股數</label>
-            <InputNumber v-model="editForm.quantity" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
+            <label for="holding-quantity" class="text-[13px] font-bold text-[var(--text-sub)]">股數</label>
+            <InputNumber inputId="holding-quantity" v-model="editForm.quantity" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
               @focus="editForm.quantity === 0 ? (editForm.quantity = null as any) : null"
               @blur="editForm.quantity === null ? (editForm.quantity = 0) : null" />
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-[13px] font-bold text-[var(--text-sub)]">成本 ({{ editForm.currency }})</label>
-            <InputNumber v-model="editForm.avgCost" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
+            <label for="holding-cost" class="text-[13px] font-bold text-[var(--text-sub)]">每股成本（{{ editForm.currency }}）</label>
+            <InputNumber inputId="holding-cost" v-model="editForm.avgCost" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
               @focus="editForm.avgCost === 0 ? (editForm.avgCost = null as any) : null"
               @blur="editForm.avgCost === null ? (editForm.avgCost = 0) : null" />
           </div>
@@ -594,16 +572,16 @@ onMounted(() => {
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center gap-2">
-              <label class="text-[13px] font-bold text-[var(--text-sub)]">市價 ({{ editForm.currency }})</label>
+              <label for="holding-price" class="text-[13px] font-bold text-[var(--text-sub)]">市價（{{ editForm.currency }}）</label>
               <i v-if="isFetchingPrice" class="pi pi-spinner animate-spin text-[var(--primary)] text-sm"></i>
             </div>
-            <InputNumber v-model="editForm.currentPrice" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4"
+            <InputNumber inputId="holding-price" v-model="editForm.currentPrice" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4"
               @focus="editForm.currentPrice === 0 ? (editForm.currentPrice = null as any) : null"
               @blur="editForm.currentPrice === null ? (editForm.currentPrice = 0) : null" />
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-[13px] font-bold text-[var(--text-sub)]">總市值 ({{ editForm.currency }})</label>
-            <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-[9px] w-full text-right font-bold text-gray-700 select-none">
+            <div class="bg-[var(--app-bg)] border border-[var(--line-soft)] rounded-lg px-3 py-[9px] w-full text-right font-semibold tabular-nums text-[var(--text-main)] select-none">
               {{ fmt((editForm.quantity || 0) * (editForm.currentPrice || 0), editForm.currency) }}
             </div>
           </div>
@@ -626,24 +604,26 @@ onMounted(() => {
 
     <!-- ─── 同步 Dialog ─── -->
     <Dialog v-model:visible="syncVisible" header="同步至本月帳戶" modal :draggable="false" :style="{ width: '90vw', maxWidth: '400px' }">
-      <div class="flex flex-col gap-4 pt-2">
+      <div class="investment-form flex flex-col gap-4 pt-2">
+        <p class="muted-label">以原幣市值覆蓋 {{ getCurrentMonth() }} 的目標帳戶記錄：台股為 TWD，美股為 USD。</p>
         <div>
-          <label class="block text-sm font-bold text-gray-700 mb-2">同步範圍</label>
-          <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <span class="block text-sm font-semibold text-[var(--text-sub)] mb-2">同步範圍</span>
+          <div class="currency-switch flex" role="group" aria-label="同步市場範圍">
             <button v-for="opt in [{ label: '全部', value: 'ALL' }, { label: '僅台股', value: 'TW' }, { label: '僅美股', value: 'US' }]" :key="opt.value"
-              class="flex-1 py-1.5 text-[13px] font-bold rounded-md transition-all"
-              :class="syncMarket === opt.value ? 'bg-white text-[var(--primary)] shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+              type="button" class="flex-1" :aria-pressed="syncMarket === opt.value"
               @click="syncMarket = opt.value as 'ALL' | 'TW' | 'US'"
             >{{ opt.label }}</button>
           </div>
         </div>
         <div v-if="syncMarket === 'ALL' || syncMarket === 'TW'" class="flex flex-col gap-2">
-          <label class="text-sm font-bold text-gray-700">台股同步目標 (覆蓋 {{ fmt(twTotalSyncValue, "TWD") }})</label>
-          <Select v-model="syncAccountTW" :options="accountOptionsForSyncTW" optionLabel="label" optionValue="value" placeholder="選擇目標帳戶" class="w-full" />
+          <label for="sync-account-tw" class="text-sm font-semibold text-[var(--text-sub)]">台股目標（覆蓋 {{ fmt(twTotalSyncValue, "TWD") }}）</label>
+          <Select inputId="sync-account-tw" v-model="syncAccountTW" :options="accountOptionsForSyncTW" optionLabel="label" optionValue="value" placeholder="選擇 TWD 資產帳戶" class="w-full" />
+          <router-link v-if="!accountOptionsForSyncTW.length" to="/records" class="text-sm text-[var(--primary)]">前往每月記錄新增 TWD 帳戶</router-link>
         </div>
         <div v-if="syncMarket === 'ALL' || syncMarket === 'US'" class="flex flex-col gap-2">
-          <label class="text-sm font-bold text-gray-700">美股同步目標 (覆蓋 {{ fmt(usTotalSyncValue, "USD") }})</label>
-          <Select v-model="syncAccountUS" :options="accountOptionsForSyncUS" optionLabel="label" optionValue="value" placeholder="選擇目標帳戶" class="w-full" />
+          <label for="sync-account-us" class="text-sm font-semibold text-[var(--text-sub)]">美股目標（覆蓋 {{ fmt(usTotalSyncValue, "USD") }}）</label>
+          <Select inputId="sync-account-us" v-model="syncAccountUS" :options="accountOptionsForSyncUS" optionLabel="label" optionValue="value" placeholder="選擇 USD 資產帳戶" class="w-full" />
+          <router-link v-if="!accountOptionsForSyncUS.length" to="/records" class="text-sm text-[var(--primary)]">前往每月記錄新增 USD 帳戶</router-link>
         </div>
       </div>
       <template #footer>
@@ -655,3 +635,53 @@ onMounted(() => {
     </Dialog>
   </div>
 </template>
+
+<style scoped>
+.investments-page { color: var(--text-main); }
+.investment-intro { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.investment-intro h1 { margin: 0 0 6px; font-size: 24px; font-weight: 650; }
+.investment-intro p, .holdings-toolbar p, .market-heading p { margin: 0; font-size: 12px; line-height: 1.6; }
+.portfolio-overview { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 24px; padding: 20px; }
+.portfolio-overview .muted-label { font-size: 12px; }
+.portfolio-total { font-size: clamp(26px, 3vw, 34px); font-weight: 650; letter-spacing: -0.04em; margin: 6px 0; font-variant-numeric: tabular-nums; }
+.portfolio-number { font-size: 22px; font-weight: 600; margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
+.pnl-positive { color: var(--positive); }
+.pnl-negative { color: var(--negative); }
+.holdings-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 20px 0 12px; }
+.currency-switch { display: inline-flex; padding: 3px; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--app-bg); flex-shrink: 0; }
+.currency-switch button { border: 0; border-radius: 4px; padding: 6px 12px; background: transparent; color: var(--text-sub); font: inherit; font-size: 12px; cursor: pointer; }
+.currency-switch button[aria-pressed="true"] { background: var(--surface); color: var(--text-main); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
+.holdings-grid { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.holdings-panel { min-width: 0; overflow: hidden; padding: 0; }
+.market-heading { padding: 16px 16px 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.market-heading h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.market-total { display: flex; gap: 8px; align-items: baseline; padding: 0 16px 14px; }
+.market-total strong { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.market-total span { font-size: 11px; }
+.holdings-empty { padding: 28px 16px; border-top: 1px solid var(--line-soft); text-align: center; font-size: 13px; }
+.holdings-empty p { margin: 0 0 6px; }
+.holdings-table-wrap { overflow-x: auto; }
+.holdings-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.holdings-table th { padding: 8px 12px; background: var(--app-bg); color: var(--text-sub); text-align: left; font-weight: 500; white-space: nowrap; }
+.holdings-table td { padding: 12px; border-top: 1px solid var(--line-soft); vertical-align: top; }
+.holdings-table th:nth-child(2) { text-align: right; }
+.holdings-table th:last-child { width: 76px; }
+.holding-name { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; border: 0; background: none; color: var(--text-main); padding: 0; font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.holding-symbol { font-size: 11px; color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.holding-detail { color: var(--text-sub); font-size: 13px; line-height: 1.6; margin-top: 3px; }
+.holding-value { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.holding-value strong { display: block; font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.holding-rate { display: block; font-size: 11px; margin-top: 2px; }
+.investment-form :deep(.p-inputnumber-input) { min-width: 0; }
+button:focus-visible, .holdings-table-wrap:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+@media (max-width: 1100px) { .holdings-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .investment-intro { align-items: flex-start; gap: 8px; }
+  .investment-intro h1 { font-size: 22px; }
+  .portfolio-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px; }
+  .portfolio-overview > div:first-child { grid-column: 1 / -1; }
+  .portfolio-number { font-size: 18px; }
+  .holdings-toolbar { align-items: flex-start; }
+  .holdings-table { min-width: 430px; }
+}
+</style>

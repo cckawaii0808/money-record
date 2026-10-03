@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, onAuthStateChanged, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 export const isMockMode = import.meta.env.VITE_USE_MOCK_DATA === 'true';
 
@@ -19,18 +19,7 @@ const app = (!isMockMode && isConfigComplete) ? initializeApp(firebaseConfig) : 
 export const auth = app ? getAuth(app) : null;
 export const googleProvider = app ? new GoogleAuthProvider() : null;
 
-// Mock implementations for easy testing without errors
-export const mockAuth = {
-  onAuthStateChanged: (cb: any) => {
-    cb({ uid: 'mock-user' });
-    return () => {};
-  },
-  signInWithPopup: async () => ({ user: { uid: 'mock-user' } }),
-  signOut: async () => {},
-  currentUser: { uid: 'mock-user' }
-};
-
-// Re-export Firebase Auth functions for use in composables
+// 匯出供認證 composable 使用的 Firebase Auth 函式。
 export { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 
 if (!isMockMode && !isConfigComplete) {

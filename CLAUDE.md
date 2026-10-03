@@ -11,25 +11,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 常用指令
 
 ```bash
-npm run dev          # 啟動開發伺服器
-npm run build        # 型別檢查 + 建置 + 複製 404.html（GitHub Pages 用）
-npm run type-check   # 僅執行 vue-tsc 型別檢查
-npm run preview      # 預覽建置結果
+pnpm dev             # 啟動開發伺服器
+pnpm build           # 型別檢查 + Vite 建置
+pnpm type-check      # 僅執行 vue-tsc 型別檢查
+pnpm preview         # 預覽建置結果
 ```
 
-> 使用 pnpm 管理套件（node_modules/.pnpm）。
+> 一律使用 pnpm 管理套件，以 pnpm-lock.yaml 為準。
 
 ### 本地環境設定
 
 複製 `.env.example` 為 `.env.local`：
 
 ```
-VITE_USE_MOCK_DATA=true        # true = 使用假資料，不需要 Supabase 連線
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
+VITE_USE_MOCK_DATA=false       # true = 跳過登入並載入部分假資料
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_API_BASE_URL=http://localhost:8787
 ```
 
-`VITE_USE_MOCK_DATA=true` 時，所有 Supabase 呼叫由 mock 物件取代，`src/data.ts` 的 `seedAccounts` / `seedRecords` 作為初始資料。
+完整設定請參考 `.env.example`。`VITE_USE_MOCK_DATA=true` 時，從 `src/data.ts` 載入帳戶、月紀錄與持倉假資料，並跳過認證；這不是完整離線模式，帳戶寫入、報價、匯率等仍可能連線。`VITE_*` 變數會進入前端建置，不可當作後端秘密。
 
 ---
 
@@ -41,7 +43,8 @@ VITE_SUPABASE_ANON_KEY=...
 | UI 元件庫 | PrimeVue 4（Aura 主題） |
 | 樣式    | Tailwind CSS v4 + `tailwindcss-primeui` |
 | 圖表    | Chart.js（透過 PrimeVue Chart 元件） |
-| 後端/DB | Supabase（PostgreSQL + Auth） |
+| 後端/DB | Cloudflare Worker（Hono + Zod OpenAPI）+ D1（SQLite） |
+| 認證 | Firebase Auth（Google OAuth） |
 | 路由    | Vue Router 4（Hash mode，`createWebHashHistory`） |
 | 狀態管理 | Pinia（`useAssetManagerStore`） |
 
@@ -51,9 +54,11 @@ VITE_SUPABASE_ANON_KEY=...
 
 ### 資料模型
 
-兩張 Supabase 資料表：
+帳戶記錄的核心 D1 資料表（定義與 migration 位於相鄰的 `money-record-api/` 專案）：
 - `accounts`：帳戶（名稱、分類、幣別 `TWD/USD/JPY`、類型 `asset/liability`、`sort_order`）
 - `monthly_records`：每月紀錄（`account_id`, `month: YYYY-MM`, `amount`）
+
+投資資料由 Worker 持倉與快照 API 管理。前端透過 `src/services/accountsApi.ts`、`holdingsApi.ts` 與 `apiClient.ts` 存取後端，不直接存取資料庫。
 
 `amountAtMonth(accountId, month)` 採「向前沿用」邏輯：若該月無資料，回傳最近一筆歷史值（而非 0）。
 
@@ -64,13 +69,14 @@ VITE_SUPABASE_ANON_KEY=...
 ### 認證
 
 `src/composables/useAuth.ts` — 模組層級 singleton，在 `App.vue#onMounted` 呼叫一次 `initAuth()`。
-使用 Google OAuth（`supabase.auth.signInWithOAuth`），PKCE flow，`redirectTo` 動態取自 `window.location.origin + BASE_URL`。
+使用 Firebase Auth 的 Google popup 登入（`signInWithPopup`），設定位於 `src/firebase.ts`。`apiClient.ts` 將 Firebase ID Token 加入 Worker 請求的 Bearer header。
 路由守衛在 `src/router/index.ts`，`meta.requiresAuth: true` 的路由皆受保護。
 
 ### 外部 API
 
-- **匯率**：`open.er-api.com/v6/latest/TWD`，透過 `allorigins.win` 代理解決 CORS
-- **股價**：Yahoo Finance API，同樣透過 `allorigins.win` 代理
+- **匯率**：直接呼叫 `open.er-api.com/v6/latest/TWD`
+- **股價／美股搜尋**：透過 Worker API 代理；不要新增前端外部報價 API 金鑰
+- **台股搜尋**：使用 `src/data/tw_stocks.json` 初始化記憶體快取，正式模式也會使用
 
 ### 樣式系統
 
@@ -78,7 +84,7 @@ VITE_SUPABASE_ANON_KEY=...
 - 深/淺色模式切換：設定 `document.documentElement.setAttribute('data-theme', 'dark'|'light')`
 - PrimeVue 的 `darkModeSelector` 設為 `[data-theme="dark"]`
 - 路徑別名：`@` → `src/`
-- 部署 base path：`/money-record/`（GitHub Pages）
+- 部署 base path：`/`（以 `vite.config.ts` 為準）
 
 ### 頁面路由
 
@@ -88,4 +94,5 @@ VITE_SUPABASE_ANON_KEY=...
 | `/dashboard` | DashboardPage | 資產總覽儀表板 |
 | `/records` | RecordsPage | 每月帳戶金額記錄 |
 | `/investments` | InvestmentsPage | 投資組合 |
-| `/settings` | SettingsPage | 帳戶管理（新增/編輯/刪除/排序） |
+| `/leaderboard` | LeaderboardPage | 淨資產排行榜（第四個分頁，需登入） |
+| `/settings` | 重新導向 `/records` | 帳戶管理已整合至每月記錄 |
