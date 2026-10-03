@@ -3,10 +3,11 @@ import { storeToRefs } from "pinia";
 import Button from "primevue/button";
 import { useAssetManagerStore } from "../../stores";
 import { isMockMode } from "../../firebase";
+import { amountColor } from "../../utils/valueColors";
+import { formatDecimal } from "../../utils/formatters";
 
 const store = useAssetManagerStore();
 const { leaderboard, leaderboardLoading, leaderboardError, leaderboardOffset, myRank } = storeToRefs(store);
-const amountFormatter = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 </script>
 
 <template>
@@ -14,16 +15,14 @@ const amountFormatter = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 
     <div class="leaderboard-heading">
       <div>
         <h2 id="leaderboard-title" class="section-heading">淨資產排行榜</h2>
-        <p class="leaderboard-note">當月 {{ leaderboard?.balanceMonth ?? '—' }}・固定當月，不受上方月份切換影響</p>
       </div>
       <Button label="刷新" icon="pi pi-refresh" size="small" severity="secondary" :disabled="leaderboardLoading" @click="store.fetchLeaderboard()" />
     </div>
     <p v-if="isMockMode" class="demo-note">僅本地示範資料：只有一筆虛構的自己，不連線同步暱稱或取得排行榜。</p>
     <div class="leaderboard-summary">
-      <span>總人數 <strong>{{ leaderboard?.totalUsers ?? '—' }}</strong></span>
-      <span>我的名次 <strong>{{ myRank === null ? '尚無名次' : `第 ${myRank} 名` }}</strong></span>
+      <span>總人數 <strong :class="amountColor(leaderboard?.totalUsers)">{{ leaderboard?.totalUsers ?? '—' }}</strong></span>
+      <span>我的名次 <strong :class="amountColor(myRank)">{{ myRank === null ? '尚無名次' : `第 ${myRank} 名` }}</strong></span>
     </div>
-    <p class="leaderboard-note">以 TWD 計算：資產帳戶總額減負債，無當月紀錄時沿用先前紀錄。股票須先同步至資產帳戶，不另外加計持倉市值。</p>
     <p v-if="leaderboardLoading" class="leaderboard-state" role="status">排行榜載入中…</p>
     <p v-if="leaderboardError" class="leaderboard-error" role="alert">{{ leaderboardError }} 請按刷新重試。</p>
     <template v-if="leaderboard && !leaderboardLoading && !leaderboardError">
@@ -35,7 +34,7 @@ const amountFormatter = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 
             <tr v-for="entry in leaderboard.entries" :key="entry.publicId" :class="{ 'current-user': entry.isCurrentUser }">
               <td data-label="名次">{{ entry.rank }}</td>
               <td data-label="暱稱" class="nickname">{{ entry.displayName }} <span v-if="entry.isCurrentUser" class="self-badge">自己</span></td>
-              <td data-label="淨資產（TWD）" class="amount">{{ amountFormatter.format(entry.netWorthTwd) }}</td>
+              <td data-label="淨資產（TWD）" class="amount" :class="amountColor(entry.netWorthTwd)">{{ formatDecimal(entry.netWorthTwd) }}</td>
               <td data-label="更新時間" class="updated-at">{{ entry.updatedAt ?? '尚無更新紀錄' }}</td>
             </tr>
           </tbody>
@@ -43,9 +42,9 @@ const amountFormatter = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 
       </div>
       <div class="leaderboard-note fx-details">
         <span v-if="!isMockMode && leaderboard.fx.isStale" class="stale-note">匯率已過期或尚無可用匯率</span>
-        <span v-if="leaderboard.fx.USD > 0">1 USD = {{ leaderboard.fx.USD }} TWD</span>
+        <span v-if="leaderboard.fx.USD > 0">1 USD = {{ formatDecimal(leaderboard.fx.USD) }} TWD</span>
         <span v-else>USD {{ isMockMode ? '本地示範未提供匯率' : '暫無可用匯率（本次無非零外幣餘額）' }}</span>
-        <span v-if="leaderboard.fx.JPY > 0">1 JPY = {{ leaderboard.fx.JPY }} TWD</span>
+        <span v-if="leaderboard.fx.JPY > 0">1 JPY = {{ formatDecimal(leaderboard.fx.JPY) }} TWD</span>
         <span v-else>JPY {{ isMockMode ? '本地示範未提供匯率' : '暫無可用匯率（本次無非零外幣餘額）' }}</span>
         <span>匯率更新：{{ leaderboard.fx.updatedAt ?? '尚無更新時間' }}</span>
         <span>排行榜產生：{{ leaderboard.generatedAt }}</span>
@@ -61,7 +60,7 @@ const amountFormatter = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 
 </template>
 
 <style scoped>
-.leaderboard-panel { margin-top: 18px; padding: 18px; color: var(--text-main); min-width: 0; }
+.leaderboard-panel { padding: 18px; color: var(--text-main); min-width: 0; }
 .leaderboard-heading, .leaderboard-summary, .leaderboard-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .leaderboard-summary { justify-content: flex-start; gap: 24px; margin: 14px 0; font-size: 14px; }
 .leaderboard-summary strong { margin-left: 6px; font-variant-numeric: tabular-nums; }
@@ -70,10 +69,12 @@ const amountFormatter = new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 
 .leaderboard-state { padding: 18px 0; color: var(--text-sub); }
 .leaderboard-error { color: var(--negative); overflow-wrap: anywhere; }
 .leaderboard-table-wrap { overflow-x: auto; }
-.leaderboard-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.leaderboard-table { width: 100%; table-layout: auto; border-collapse: collapse; font-size: 15px; }
 th, td { padding: 12px 10px; border-bottom: 1px solid var(--line-soft); text-align: left; }
 th { color: var(--text-sub); font-size: 12px; font-weight: 500; }
-.amount { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.amount { text-align: left; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.leaderboard-table th:not(:last-child), .leaderboard-table td:not(:last-child) { width: 1%; white-space: nowrap; padding-right: 28px; }
+.leaderboard-table th:last-child, .leaderboard-table td:last-child { width: auto; }
 .nickname { overflow-wrap: anywhere; }
 .updated-at { color: var(--text-sub); font-size: 12px; overflow-wrap: anywhere; }
 .current-user { background: var(--app-bg); }
@@ -89,6 +90,7 @@ th { color: var(--text-sub); font-size: 12px; font-weight: 500; }
   td { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border: 0; text-align: right; }
   td::before { content: attr(data-label); color: var(--text-sub); font-size: 12px; flex-shrink: 0; }
   .nickname { flex-wrap: wrap; }
+  .leaderboard-table th:not(:last-child), .leaderboard-table td:not(:last-child) { width: auto; white-space: normal; padding-right: 10px; }
   .amount { white-space: normal; overflow-wrap: anywhere; }
   .current-user { border-left: 3px solid var(--primary); }
   .current-user td:first-child { border-left: 0; }

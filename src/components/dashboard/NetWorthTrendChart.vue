@@ -33,7 +33,7 @@ let observer: MutationObserver | undefined;
 function refreshTheme() {
   const css = getComputedStyle(document.documentElement);
   const read = (name: string) => css.getPropertyValue(name).trim();
-  colors.value = { text: read("--text-sub"), line: read("--line-soft"), surface: read("--surface"), main: read("--text-main"), primary: read("--primary"), asset: read("--positive"), liability: read("--negative") };
+   colors.value = { text: read("--text-sub"), line: read("--line-soft"), surface: read("--surface"), main: read("--text-main"), primary: read("--chart-net"), asset: read("--chart-asset"), liability: read("--chart-liability") };
 }
 onMounted(() => {
   refreshTheme();
@@ -69,7 +69,7 @@ const chartOptions = computed<ChartOptions<"line">>(() => ({
   plugins: {
     legend: { display: metric.value === "compare", position: "bottom", labels: { color: colors.value.text, boxWidth: 16, boxHeight: 2 } },
     tooltip: {
-      backgroundColor: colors.value.surface, titleColor: colors.value.main, bodyColor: colors.value.text,
+       backgroundColor: colors.value.surface, titleColor: colors.value.main, bodyColor: colors.value.main,
       footerColor: colors.value.text, borderColor: colors.value.line, borderWidth: 1, cornerRadius: 6,
       callbacks: { label: (context) => `${context.dataset.label}：${formatTwd(context.parsed.y ?? 0)} TWD`, footer: () => "點選切換月份" },
     },

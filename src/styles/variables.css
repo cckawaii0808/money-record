@@ -16,6 +16,9 @@
   --positive: #087f72;
   --negative: #c54856;
   --warn: #a96916;
+  --chart-net: var(--text-main);
+  --chart-asset: #5285cf;
+  --chart-liability: #9473bb;
   --sidebar-bg: var(--surface);
   --sidebar-text: var(--text-sub);
   --sidebar-text-muted: var(--text-muted);
@@ -41,4 +44,6 @@
   --positive: #58d2b5;
   --negative: #fb8997;
   --warn: #edb865;
+  --chart-asset: #88b0f0;
+  --chart-liability: #bc9cde;
 }

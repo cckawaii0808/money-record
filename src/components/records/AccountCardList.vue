@@ -6,6 +6,7 @@ import Tag from "primevue/tag";
 import Tooltip from "primevue/tooltip";
 import type { AccountType, Currency } from "../../types";
 import { useIsDesktop } from "../../composables/useIsDesktop";
+import { amountColor, changeColor } from "../../utils/valueColors";
 
 export interface AccountCardItem {
   id: string;
@@ -160,13 +161,13 @@ defineExpose({ focusAmount });
           </div>
              <button v-else type="button" class="amount-button" :disabled="saving" :aria-label="`編輯 ${account.name} 餘額 ${numberFormatter.format(account.amount)} ${account.currency}`" @click="emit('edit-amount', account)">
                <span class="amount-prefix" aria-hidden="true">{{ currencyPrefixes[account.currency as Currency] }}</span>
-               <span class="amount-value">{{ account.status === 'empty' ? '—' : numberFormatter.format(account.amount) }}</span>
+               <span class="amount-value" :class="amountColor(account.status === 'empty' ? null : account.amount)">{{ account.status === 'empty' ? '—' : numberFormatter.format(account.amount) }}</span>
             </button>
         </template>
       </Column>
       <Column field="delta" header="較上月" :sortable="!editing && !sortingLocked && !saving" headerClass="delta-column" bodyClass="delta-column">
         <template #body="{ data: account }">
-          <span class="tabular-nums" :class="account.delta === null || account.delta === 0 ? 'muted-label' : ((account.type === 'asset' ? account.delta > 0 : account.delta < 0) ? 'delta-positive' : 'delta-negative')">
+          <span class="tabular-nums" :class="changeColor(account.delta == null ? null : account.type === 'liability' ? -account.delta : account.delta)">
             {{ account.delta === null ? '—' : `${account.delta > 0 ? '+' : ''}${numberFormatter.format(account.delta)}` }}
           </span>
         </template>
@@ -212,7 +213,7 @@ button.account-name { font-weight: 600; text-align: left; }
 button.account-name:hover { color: var(--primary); text-decoration: underline; }
 .amount-button, .amount-editor { display: flex; align-items: center; gap: 5px; width: min(100%, 180px); min-height: 30px; margin-inline: auto; padding: 3px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); font-variant-numeric: tabular-nums; }
 .amount-button { border-color: transparent; background: transparent; }
-.amount-button:hover { color: var(--primary); }
+.amount-button:hover { background: var(--app-bg); }
 .amount-button:focus-visible, .amount-editor:focus-within { outline: 2px solid var(--primary); outline-offset: 1px; }
 .amount-value { text-align: right; overflow-wrap: anywhere; }
 .amount-value { flex: 1; min-width: 0; }

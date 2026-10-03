@@ -5,7 +5,7 @@ interface SelectOption { label: string; value: string | number; }
 
 import { EARLIEST_SELECTABLE_MONTH } from "../constants";
 import type { Account, AccountType, Currency, Holding, InvestmentSnapshotPoint, MonthlyRecord } from "../types";
-import { formatCurrency, formatPct } from "../utils/formatters";
+import { formatCurrency, formatDecimal, formatPct } from "../utils/formatters";
 import {
   getCurrentMonth,
   monthToEndTimestamp,
@@ -702,8 +702,8 @@ export const useAssetManagerStore = defineStore("assetManager", () => {
   });
 
   const fxDisplayLabel = computed(() => {
-    const usd = fxRates.value.USD.toFixed(2);
-    const jpy = fxRates.value.JPY.toFixed(4);
+    const usd = formatDecimal(fxRates.value.USD);
+    const jpy = formatDecimal(fxRates.value.JPY);
     return `USD ${usd} / JPY ${jpy}`;
   });
 

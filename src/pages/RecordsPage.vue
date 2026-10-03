@@ -15,6 +15,7 @@ import type { AccountCardItem, AccountDraft } from "../components/records/Accoun
 import AccountManageDialog from "../components/records/AccountManageDialog.vue";
 import { useAuth } from "../composables/useAuth";
 import { isMockMode } from "../firebase";
+import { amountColor } from "../utils/valueColors";
 
 const { isDesktop } = useIsDesktop();
 const route = useRoute();
@@ -254,9 +255,9 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", beforeUnload));
 
     <div class="records-content">
     <section class="workspace-panel records-summary" aria-label="本月摘要（折合台幣）" :aria-busy="isLoading">
-      <div class="summary-item"><span class="muted-label">淨值 · TWD</span><strong>{{ isLoading ? '—' : formatCurrency(summary.net, 'TWD') }}</strong></div>
-      <div class="summary-item"><span class="muted-label">資產 · TWD</span><strong>{{ isLoading ? '—' : formatCurrency(summary.asset, 'TWD') }}</strong></div>
-      <div class="summary-item"><span class="muted-label">負債 · TWD</span><strong>{{ isLoading ? '—' : formatCurrency(summary.liability, 'TWD') }}</strong></div>
+       <div class="summary-item"><span class="muted-label">淨值 · TWD</span><strong :class="amountColor(isLoading ? null : summary.net)">{{ isLoading ? '—' : formatCurrency(summary.net, 'TWD') }}</strong></div>
+       <div class="summary-item"><span class="muted-label">資產 · TWD</span><strong :class="amountColor(isLoading ? null : summary.asset)">{{ isLoading ? '—' : formatCurrency(summary.asset, 'TWD') }}</strong></div>
+       <div class="summary-item"><span class="muted-label">負債 · TWD</span><strong :class="amountColor(isLoading ? null : summary.liability)">{{ isLoading ? '—' : formatCurrency(summary.liability, 'TWD') }}</strong></div>
       <div class="summary-item summary-progress"><span class="muted-label">{{ displayMonth }} 已更新</span><strong>{{ isLoading ? '—' : `${updatedCount} / ${accounts.length}` }}<small v-if="!isLoading">待更新 {{ pendingCount }} 筆</small></strong></div>
     </section>
 
@@ -310,10 +311,11 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", beforeUnload));
 .records-content { width: 100%; min-width: 0; }
 .month-controls { margin: 0; padding: 0; border: 0; min-width: 0; }
 .month-controls:disabled { opacity: 0.6; }
-.records-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 10px 14px; gap: 12px; margin-bottom: 12px; }
-.summary-item { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.summary-item > span { font-size: 13px; }
-.summary-item strong { color: var(--text-main); font-size: 22px; line-height: 1.25; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.records-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 0; margin-bottom: 18px; }
+.summary-item { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 16px 18px; }
+.summary-item + .summary-item { border-left: 1px solid var(--line-soft); }
+.summary-item > span { font-size: 13px; line-height: 20px; }
+.summary-item strong { color: var(--text-main); font-size: 26px; line-height: 1.25; font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .summary-item small { display: inline; margin-left: 8px; font-size: 13px; font-weight: 400; color: var(--text-sub); white-space: nowrap; }
 .records-panel { padding: 0; overflow: hidden; }
 .records-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px 12px; }
@@ -345,7 +347,11 @@ onBeforeUnmount(() => window.removeEventListener("beforeunload", beforeUnload));
 .single-edit-content { display: flex; flex-direction: column; gap: 16px; padding-block: 8px; }
 .single-edit-content p { margin: 0; font-size: 13px; line-height: 1.6; }
 @media (max-width: 640px) {
-  .records-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; gap: 12px; }
+  .records-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary-item { padding: 14px; }
+  .summary-item:nth-child(3) { border-left: 0; }
+  .summary-item:nth-child(n + 3) { border-top: 1px solid var(--line-soft); }
+  .summary-item strong { font-size: 22px; }
   .summary-item small { display: block; margin: 3px 0 0; }
   .records-heading { padding: 12px; align-items: flex-start; }
   .records-heading p { max-width: 230px; }

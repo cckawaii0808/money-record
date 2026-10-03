@@ -48,14 +48,15 @@ h1, h2, h3, h4, h5, h6 {
 
 /* 漲跌顏色 */
 .text-positive {
-  color: var(--positive);
+  color: var(--positive) !important;
 }
 .text-negative {
-  color: var(--negative);
+  color: var(--negative) !important;
 }
 .text-sub {
-  color: var(--text-sub);
+  color: var(--text-sub) !important;
 }
+.text-main { color: var(--text-main) !important; }
 
 /* 手機底部導覽留白 (很重要，保持手機操作體驗) */
 @media (max-width: 639px) {

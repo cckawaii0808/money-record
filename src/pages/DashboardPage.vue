@@ -5,7 +5,7 @@ import { useRouter } from "vue-router";
 import Skeleton from "primevue/skeleton";
 import { useIsDesktop } from "../composables/useIsDesktop";
 import { useAssetManagerStore } from "../stores";
-import { formatTwd } from "../utils/formatters";
+import { formatDecimal, formatTwd } from "../utils/formatters";
 import DashboardKpiCard from "../components/dashboard/DashboardKpiCard.vue";
 import AssetDonutChart from "../components/dashboard/AssetDonutChart.vue";
 import type { DonutItem } from "../components/dashboard/AssetDonutChart.vue";
@@ -13,6 +13,7 @@ import NetWorthTrendChart from "../components/dashboard/NetWorthTrendChart.vue";
 import PageHeader from "../components/common/PageHeader.vue";
 import MonthNavigator from "../components/common/MonthNavigator.vue";
 import Button from "primevue/button";
+import { amountColor } from "../utils/valueColors";
 
 const { isDesktop } = useIsDesktop();
 const store = useAssetManagerStore();
@@ -92,7 +93,7 @@ function openRecords(accountIds?: string[]) {
       <template #extra><Button label="更新紀錄" icon="pi pi-arrow-up-right" size="small" @click="openRecords()" /></template>
     </PageHeader>
 
-    <DashboardKpiCard :loading="isLoading" :net-worth="formatTwd(netWorth)" :total-asset="formatTwd(totals.asset)" :total-liability="formatTwd(totals.liability)" :delta="delta === null ? undefined : signedTwd(delta)" :delta-value="delta ?? undefined" :delta-pct="deltaPct" :comparison-month="comparisonMonth" />
+    <DashboardKpiCard :loading="isLoading" :net-worth="formatTwd(netWorth)" :total-asset="formatTwd(totals.asset)" :total-liability="formatTwd(totals.liability)" :net-worth-value="netWorth" :total-asset-value="totals.asset" :total-liability-value="totals.liability" :delta="delta === null ? undefined : signedTwd(delta)" :delta-value="delta ?? undefined" :delta-pct="deltaPct" :comparison-month="comparisonMonth" />
 
     <div class="overview-grid">
       <NetWorthTrendChart :trend-rows="trendRows" :selected-month="selectedMonth" :loading="isLoading" @select-month="selectedMonth = $event" />
@@ -104,7 +105,7 @@ function openRecords(accountIds?: string[]) {
         <h2 class="section-heading">債務比例水位</h2>
         <Skeleton v-if="isLoading" width="100%" height="100px" />
         <template v-else>
-          <strong class="ratio-value">{{ debtRatio === null ? '—' : `${debtRatio.toFixed(1)}%` }}</strong>
+          <strong class="ratio-value" :class="amountColor(debtRatio)">{{ debtRatio === null ? '—' : `${debtRatio.toFixed(1)}%` }}</strong>
           <div class="level-track" role="img" :aria-label="debtRatio === null ? '無法計算債務比例' : `負債占資產 ${debtRatio.toFixed(1)}%`"><span :style="{ width: `${Math.min(100, Math.max(0, debtRatio ?? 0))}%` }" /></div>
           <div class="level-labels"><span>0%</span><span>100%</span></div>
           <dl class="debt-totals"><div><dt>資產</dt><dd>{{ formatTwd(totals.asset) }}</dd></div><div><dt>負債</dt><dd>{{ formatTwd(totals.liability) }}</dd></div></dl>
@@ -129,7 +130,7 @@ function openRecords(accountIds?: string[]) {
 
     <footer class="fx-note">
       <span class="currency-badge">TWD</span>
-      <span>1 USD = {{ store.fxRates.USD.toFixed(2) }} TWD・1 JPY = {{ store.fxRates.JPY.toFixed(4) }} TWD</span>
+      <span>1 USD = {{ formatDecimal(store.fxRates.USD) }} TWD・1 JPY = {{ formatDecimal(store.fxRates.JPY) }} TWD</span>
       <span>{{ store.fxUpdatedAt ? `匯率更新：${store.fxUpdatedLabel}` : '匯率尚未取得更新時間，使用預設換算值' }}{{ store.fxError ? '・更新失敗，沿用現有匯率' : '' }}</span>
     </footer>
   </div>

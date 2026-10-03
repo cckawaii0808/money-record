@@ -9,6 +9,12 @@ const LOCALE_MAP: Record<Currency, string> = {
 const intFormatter = new Intl.NumberFormat("zh-TW", {
   maximumFractionDigits: 0
 });
+const decimalFormatter = new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 2 });
+
+/** 僅格式化顯示，保留原始數值供計算使用。 */
+export function formatDecimal(value: number): string {
+  return Number.isFinite(value) ? decimalFormatter.format(value) : "—";
+}
 
 const twdCurrencyFormatter = new Intl.NumberFormat("zh-TW", {
   style: "currency",

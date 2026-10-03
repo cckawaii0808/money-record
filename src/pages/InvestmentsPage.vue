@@ -25,6 +25,7 @@ import {
 import { initStockCache } from "../services/stockListSync";
 import { searchStocksFromCache } from "../services/stockListApi";
 import { getCurrentMonth } from "../utils/monthUtils";
+import { amountColor, changeColor } from "../utils/valueColors";
 
 const store = useAssetManagerStore();
 const toast = useToast();
@@ -96,6 +97,11 @@ const fmt = (v: number, curr = "TWD") =>
 const fmtSigned = (v: number, curr = "TWD") =>
   `${v > 0 ? "+" : ""}${fmt(v, curr)}`;
 
+const fmtRate = (value: number | null) =>
+  value === null || !Number.isFinite(value)
+    ? "—"
+    : `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+
 const fmtSymbol = (sym: string) => sym.replace(/\.(TW|TWO)$/i, "");
 
 function toTwd(amount: number, currency: string): number {
@@ -115,8 +121,12 @@ function calcPnl(h: Holding): number {
   return h.gainLoss;
 }
 
-function calcPnlRate(h: Holding): number {
-  return h.gainLossPct ?? 0;
+function calcPnlRate(h: Holding): number | null {
+  const cost = totalCost(h);
+  const rate = h.gainLossPct;
+  return cost === 0 || !Number.isFinite(cost) || rate === null || !Number.isFinite(rate)
+    ? null
+    : rate;
 }
 
 function displayAmount(h: Holding): { amount: number; currency: string; showTwdSub: boolean; twdAmount: number } {
@@ -149,9 +159,11 @@ const totalCostTwd = computed(() =>
   store.holdings.reduce((s, h) => s + toTwd(totalCost(h), h.currency), 0),
 );
 
-const totalPnlRate = computed(() =>
-  totalCostTwd.value === 0 ? 0 : (totalPnlTwd.value / totalCostTwd.value) * 100,
-);
+const totalPnlRate = computed(() => {
+  if (totalCostTwd.value === 0 || !Number.isFinite(totalCostTwd.value)) return null;
+  const rate = (totalPnlTwd.value / totalCostTwd.value) * 100;
+  return Number.isFinite(rate) ? rate : null;
+});
 
 function marketSummary(holdings: Holding[], label: string, market: string) {
   const isTw = market === "TW";
@@ -428,18 +440,17 @@ onMounted(() => {
 
     <section class="workspace-panel portfolio-overview" aria-label="投資總覽">
       <div>
-        <div class="muted-label">總市值 <span class="currency-badge">TWD</span></div>
-        <div class="portfolio-total">{{ fmt(totalTwd) }}</div>
-        <div class="muted-label">{{ store.holdings.length }} 檔持倉・依目前匯率折算</div>
+        <div class="muted-label">總市值 · TWD</div>
+        <div class="portfolio-total" :class="amountColor(totalTwd)">{{ fmt(totalTwd) }}</div>
       </div>
       <div>
-        <div class="muted-label">總投入成本（TWD）</div>
-        <div class="portfolio-number">{{ fmt(totalCostTwd) }}</div>
+        <div class="muted-label">總投入成本 · TWD</div>
+        <div class="portfolio-number" :class="amountColor(totalCostTwd)">{{ fmt(totalCostTwd) }}</div>
       </div>
       <div>
-        <div class="muted-label">未實現損益（TWD）</div>
-        <div class="portfolio-number" :class="totalPnlTwd >= 0 ? 'pnl-positive' : 'pnl-negative'">{{ fmtSigned(totalPnlTwd) }}</div>
-        <div class="text-xs tabular-nums" :class="totalPnlTwd >= 0 ? 'pnl-positive' : 'pnl-negative'">{{ totalPnlRate > 0 ? '+' : '' }}{{ totalPnlRate.toFixed(1) }}%</div>
+        <div class="muted-label">未實現損益 · TWD</div>
+        <div class="portfolio-number" :class="changeColor(totalPnlTwd)">{{ fmtSigned(totalPnlTwd) }}</div>
+        <div class="text-xs tabular-nums" :class="changeColor(totalPnlRate)">{{ fmtRate(totalPnlRate) }}</div>
       </div>
     </section>
 
@@ -456,12 +467,12 @@ onMounted(() => {
         <div class="market-heading">
           <div>
             <h2 class="section-heading">{{ g.label }} <span class="currency-badge">{{ g.currency }}</span></h2>
-            <p class="muted-label">{{ g.count }} 檔・配置 {{ g.allocation.toFixed(1) }}%</p>
+            <p class="muted-label"><span :class="amountColor(g.count)">{{ g.count }}</span> 檔・配置 <span :class="amountColor(g.allocation)">{{ g.allocation.toFixed(1) }}%</span></p>
           </div>
           <Button label="新增" :aria-label="`新增${g.label}投資`" icon="pi pi-plus" size="small" severity="secondary" outlined @click="openAdd(g.market as 'TW' | 'US')" />
         </div>
         <div class="market-total">
-          <strong>{{ fmt(displayCurrency === 'twd' ? g.twdValue : g.nativeValue, displayCurrency === 'twd' ? 'TWD' : g.currency) }}</strong>
+          <strong :class="amountColor(displayCurrency === 'twd' ? g.twdValue : g.nativeValue)">{{ fmt(displayCurrency === 'twd' ? g.twdValue : g.nativeValue, displayCurrency === 'twd' ? 'TWD' : g.currency) }}</strong>
           <span class="muted-label">{{ displayCurrency === 'twd' ? '折台幣市值' : '原幣市值' }}</span>
         </div>
         <div v-if="!g.count" class="holdings-empty">
@@ -479,17 +490,18 @@ onMounted(() => {
                     <span class="holding-symbol">{{ fmtSymbol(h.symbol) }}</span>
                     <span>{{ h.name || h.symbol }}</span>
                   </button>
-                  <div class="holding-detail">{{ h.quantity.toLocaleString('zh-TW') }} 股・{{ h.currency }}</div>
-                  <div class="holding-detail">成本 {{ fmt(h.avgCost, h.currency) }}／市價 {{ h.currentPrice === null ? '—' : fmt(h.currentPrice, h.currency) }}</div>
+                  <div class="holding-detail"><span :class="amountColor(h.quantity)">{{ h.quantity.toLocaleString('zh-TW') }}</span> 股・{{ h.currency }}</div>
+                  <div class="holding-detail">成本 <span :class="amountColor(h.avgCost)">{{ fmt(h.avgCost, h.currency) }}</span>／市價 <span :class="amountColor(h.currentPrice)">{{ h.currentPrice === null ? '—' : fmt(h.currentPrice, h.currency) }}</span></div>
                 </td>
                 <td class="holding-value">
-                  <strong>{{ fmt(displayAmount(h).amount, displayAmount(h).currency) }}</strong>
+                  <strong :class="amountColor(displayAmount(h).amount)">{{ fmt(displayAmount(h).amount, displayAmount(h).currency) }}</strong>
                   <div v-if="displayAmount(h).showTwdSub" class="holding-detail">
-                    {{ displayCurrency === 'twd' ? `原幣 ${h.currency} ${fmt(h.marketValue, h.currency)}` : `約 TWD ${fmt(displayAmount(h).twdAmount)}` }}
+                    {{ displayCurrency === 'twd' ? `原幣 ${h.currency}` : '約 TWD' }}
+                    <span :class="amountColor(displayCurrency === 'twd' ? h.marketValue : displayAmount(h).twdAmount)">{{ displayCurrency === 'twd' ? fmt(h.marketValue, h.currency) : fmt(displayAmount(h).twdAmount) }}</span>
                   </div>
-                  <div :class="calcPnl(h) >= 0 ? 'pnl-positive' : 'pnl-negative'">
+                  <div :class="changeColor(calcPnl(h))">
                     {{ fmtSigned(displayPnl(h).amount, displayPnl(h).currency) }}
-                    <span class="holding-rate">{{ h.gainLossPct === null ? '—' : `${calcPnlRate(h) > 0 ? '+' : ''}${calcPnlRate(h).toFixed(1)}%` }}</span>
+                    <span class="holding-rate" :class="changeColor(calcPnlRate(h))">{{ fmtRate(calcPnlRate(h)) }}</span>
                   </div>
                 </td>
                 <td>
@@ -557,13 +569,13 @@ onMounted(() => {
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
             <label for="holding-quantity" class="text-[13px] font-bold text-[var(--text-sub)]">股數</label>
-            <InputNumber inputId="holding-quantity" v-model="editForm.quantity" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
+            <InputNumber inputId="holding-quantity" v-model="editForm.quantity" class="w-full" :inputClass="`w-full !rounded-lg ${amountColor(editForm.quantity)}`" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
               @focus="editForm.quantity === 0 ? (editForm.quantity = null as any) : null"
               @blur="editForm.quantity === null ? (editForm.quantity = 0) : null" />
           </div>
           <div class="flex flex-col gap-1.5">
             <label for="holding-cost" class="text-[13px] font-bold text-[var(--text-sub)]">每股成本（{{ editForm.currency }}）</label>
-            <InputNumber inputId="holding-cost" v-model="editForm.avgCost" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
+            <InputNumber inputId="holding-cost" v-model="editForm.avgCost" class="w-full" :inputClass="`w-full !rounded-lg ${amountColor(editForm.avgCost)}`" :minFractionDigits="0" :maxFractionDigits="4" placeholder="0"
               @focus="editForm.avgCost === 0 ? (editForm.avgCost = null as any) : null"
               @blur="editForm.avgCost === null ? (editForm.avgCost = 0) : null" />
           </div>
@@ -575,13 +587,13 @@ onMounted(() => {
               <label for="holding-price" class="text-[13px] font-bold text-[var(--text-sub)]">市價（{{ editForm.currency }}）</label>
               <i v-if="isFetchingPrice" class="pi pi-spinner animate-spin text-[var(--primary)] text-sm"></i>
             </div>
-            <InputNumber inputId="holding-price" v-model="editForm.currentPrice" class="w-full" inputClass="w-full !rounded-lg" :minFractionDigits="0" :maxFractionDigits="4"
+            <InputNumber inputId="holding-price" v-model="editForm.currentPrice" class="w-full" :inputClass="`w-full !rounded-lg ${amountColor(editForm.currentPrice)}`" :minFractionDigits="0" :maxFractionDigits="4"
               @focus="editForm.currentPrice === 0 ? (editForm.currentPrice = null as any) : null"
               @blur="editForm.currentPrice === null ? (editForm.currentPrice = 0) : null" />
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-[13px] font-bold text-[var(--text-sub)]">總市值 ({{ editForm.currency }})</label>
-            <div class="bg-[var(--app-bg)] border border-[var(--line-soft)] rounded-lg px-3 py-[9px] w-full text-right font-semibold tabular-nums text-[var(--text-main)] select-none">
+            <div class="bg-[var(--app-bg)] border border-[var(--line-soft)] rounded-lg px-3 py-[9px] w-full text-right font-semibold tabular-nums select-none" :class="amountColor((editForm.quantity || 0) * (editForm.currentPrice || 0))">
               {{ fmt((editForm.quantity || 0) * (editForm.currentPrice || 0), editForm.currency) }}
             </div>
           </div>
@@ -616,12 +628,12 @@ onMounted(() => {
           </div>
         </div>
         <div v-if="syncMarket === 'ALL' || syncMarket === 'TW'" class="flex flex-col gap-2">
-          <label for="sync-account-tw" class="text-sm font-semibold text-[var(--text-sub)]">台股目標（覆蓋 {{ fmt(twTotalSyncValue, "TWD") }}）</label>
+          <label for="sync-account-tw" class="text-sm font-semibold text-[var(--text-sub)]">台股目標（覆蓋 <span :class="amountColor(twTotalSyncValue)">{{ fmt(twTotalSyncValue, "TWD") }}</span>）</label>
           <Select inputId="sync-account-tw" v-model="syncAccountTW" :options="accountOptionsForSyncTW" optionLabel="label" optionValue="value" placeholder="選擇 TWD 資產帳戶" class="w-full" />
           <router-link v-if="!accountOptionsForSyncTW.length" to="/records" class="text-sm text-[var(--primary)]">前往每月記錄新增 TWD 帳戶</router-link>
         </div>
         <div v-if="syncMarket === 'ALL' || syncMarket === 'US'" class="flex flex-col gap-2">
-          <label for="sync-account-us" class="text-sm font-semibold text-[var(--text-sub)]">美股目標（覆蓋 {{ fmt(usTotalSyncValue, "USD") }}）</label>
+          <label for="sync-account-us" class="text-sm font-semibold text-[var(--text-sub)]">美股目標（覆蓋 <span :class="amountColor(usTotalSyncValue)">{{ fmt(usTotalSyncValue, "USD") }}</span>）</label>
           <Select inputId="sync-account-us" v-model="syncAccountUS" :options="accountOptionsForSyncUS" optionLabel="label" optionValue="value" placeholder="選擇 USD 資產帳戶" class="w-full" />
           <router-link v-if="!accountOptionsForSyncUS.length" to="/records" class="text-sm text-[var(--primary)]">前往每月記錄新增 USD 帳戶</router-link>
         </div>
@@ -641,12 +653,12 @@ onMounted(() => {
 .investment-intro { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .investment-intro h1 { margin: 0 0 6px; font-size: 24px; font-weight: 650; }
 .investment-intro p, .holdings-toolbar p, .market-heading p { margin: 0; font-size: 12px; line-height: 1.6; }
-.portfolio-overview { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 24px; padding: 20px; }
-.portfolio-overview .muted-label { font-size: 12px; }
-.portfolio-total { font-size: clamp(26px, 3vw, 34px); font-weight: 650; letter-spacing: -0.04em; margin: 6px 0; font-variant-numeric: tabular-nums; }
-.portfolio-number { font-size: 22px; font-weight: 600; margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
-.pnl-positive { color: var(--positive); }
-.pnl-negative { color: var(--negative); }
+.portfolio-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; padding: 0; }
+.portfolio-overview > div { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; min-width: 0; }
+.portfolio-overview > div + div { border-left: 1px solid var(--line-soft); }
+.portfolio-overview .muted-label { font-size: 13px; line-height: 20px; }
+.portfolio-total, .portfolio-number { font-size: 26px; line-height: 1.25; font-weight: 650; margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.text-main, :deep(.text-main) { color: var(--text-main); }
 .holdings-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 20px 0 12px; }
 .currency-switch { display: inline-flex; padding: 3px; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--app-bg); flex-shrink: 0; }
 .currency-switch button { border: 0; border-radius: 4px; padding: 6px 12px; background: transparent; color: var(--text-sub); font: inherit; font-size: 12px; cursor: pointer; }
@@ -678,9 +690,12 @@ button:focus-visible, .holdings-table-wrap:focus-visible { outline: 2px solid va
 @media (max-width: 640px) {
   .investment-intro { align-items: flex-start; gap: 8px; }
   .investment-intro h1 { font-size: 22px; }
-  .portfolio-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 16px; }
+  .portfolio-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .portfolio-overview > div { padding: 14px; }
+  .portfolio-overview > div:nth-child(2) { border-left: 0; }
+  .portfolio-overview > div:not(:first-child) { border-top: 1px solid var(--line-soft); }
   .portfolio-overview > div:first-child { grid-column: 1 / -1; }
-  .portfolio-number { font-size: 18px; }
+  .portfolio-total, .portfolio-number { font-size: 22px; }
   .holdings-toolbar { align-items: flex-start; }
   .holdings-table { min-width: 430px; }
 }

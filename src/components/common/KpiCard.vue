@@ -12,6 +12,7 @@
  *   loading   - 是否顯示 Skeleton
  */
 import Skeleton from "primevue/skeleton";
+import { changeColor } from "../../utils/valueColors";
 
 defineProps<{
   label: string;
@@ -20,6 +21,7 @@ defineProps<{
   variant?: "default" | "positive" | "negative" | "neutral";
   delta?: string;
   deltaPct?: number | null;
+  deltaValue?: number | null;
   loading?: boolean;
 }>();
 </script>
@@ -45,9 +47,7 @@ defineProps<{
           <span
             class="text-2xl font-black tabular-nums tracking-tight"
             :class="{
-              'text-[var(--text-main)]': !variant || variant === 'default',
-              'text-[var(--positive)]': variant === 'positive',
-              'text-[var(--negative)]': variant === 'negative',
+              'text-[var(--text-main)]': variant !== 'neutral',
               'text-[var(--text-sub)]': variant === 'neutral',
             }"
           >
@@ -60,8 +60,8 @@ defineProps<{
           :class="{
             'bg-[var(--primary-soft)] text-[var(--primary)]':
               !variant || variant === 'default' || variant === 'neutral',
-            'bg-green-50 text-green-500': variant === 'positive',
-            'bg-red-50 text-red-500': variant === 'negative',
+             'bg-[var(--primary-soft)] text-[var(--positive)]': variant === 'positive',
+             'bg-[var(--app-bg)] text-[var(--negative)]': variant === 'negative',
           }"
         >
           <i :class="icon"></i>
@@ -72,25 +72,22 @@ defineProps<{
         <span
           v-if="delta && deltaPct !== null && deltaPct !== undefined"
           class="text-sm font-bold tabular-nums flex items-center gap-1"
-          :class="deltaPct >= 0 ? 'text-[var(--positive)]' : 'text-[var(--negative)]'"
+          :class="changeColor(deltaValue ?? deltaPct)"
         >
           {{ delta }}
           <span class="text-xs">
-            ({{ deltaPct >= 0 ? "+" : "" }}{{ deltaPct.toFixed(1) }}%)
+            ({{ deltaPct > 0 ? "+" : "" }}{{ deltaPct.toFixed(1) }}%)
           </span>
           <i
-            :class="deltaPct >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"
+            v-if="(deltaValue ?? deltaPct) !== 0"
+            :class="(deltaValue ?? deltaPct) > 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'"
             class="text-[10px]"
           />
         </span>
         <span
           v-else-if="delta"
           class="text-sm font-bold"
-          :class="{
-            'text-[var(--positive)]': !variant || variant === 'positive',
-            'text-[var(--negative)]': variant === 'negative',
-            'text-[var(--text-sub)]': variant === 'neutral' || variant === 'default',
-          }"
+          :class="changeColor(deltaValue)"
         >
           {{ delta }}
         </span>

@@ -10,6 +10,7 @@
 import Tag from "primevue/tag";
 import type { Currency } from "../../types";
 import { formatCurrency } from "../../utils/formatters";
+import { changeColor } from "../../utils/valueColors";
 
 export interface ChangeItem {
   accountName: string;
@@ -77,11 +78,7 @@ const topChanges = () => {
 
           <span
             class="text-[15px] font-black tabular-nums"
-            :class="
-              item.delta > 0
-                ? 'text-[var(--positive)]'
-                : 'text-[var(--negative)]'
-            "
+            :class="changeColor(item.type === 'liability' ? -item.delta : item.delta)"
           >
             {{ item.delta > 0 ? "+" : "" }}{{ formatCurrency(item.delta, item.currency) }}
           </span>

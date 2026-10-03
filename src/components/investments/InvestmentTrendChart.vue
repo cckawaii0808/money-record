@@ -5,6 +5,7 @@ import Skeleton from "primevue/skeleton";
 import Button from "primevue/button";
 import type { InvestmentSnapshotPoint } from "../../types";
 import { formatTwd } from "../../utils/formatters";
+import { amountColor } from "../../utils/valueColors";
 
 type RangePreset = "7d" | "30d" | "90d" | "ytd" | "all" | "custom";
 
@@ -21,7 +22,7 @@ const emit = defineEmits<{
 const selectedPreset = ref<RangePreset>("30d");
 const customStartDate = ref("");
 const customEndDate = ref("");
-const themeColors = ref({ text: "#64748b", surface: "#ffffff", border: "#e2e8f0", main: "#1e293b" });
+const themeColors = ref({ text: "", surface: "", border: "", main: "", net: "", asset: "", liability: "" });
 let themeObserver: MutationObserver | undefined;
 
 function updateThemeColors() {
@@ -31,6 +32,9 @@ function updateThemeColors() {
     surface: styles.getPropertyValue("--surface").trim(),
     border: styles.getPropertyValue("--line-soft").trim(),
     main: styles.getPropertyValue("--text-main").trim(),
+    net: styles.getPropertyValue("--chart-net").trim(),
+    asset: styles.getPropertyValue("--chart-asset").trim(),
+    liability: styles.getPropertyValue("--chart-liability").trim(),
   };
 }
 
@@ -112,8 +116,8 @@ const chartData = computed(() => ({
     {
       label: "總股票資產",
       data: normalizedRows.value.map((row) => row.totalValueTwd),
-      borderColor: "#0f766e",
-      backgroundColor: "rgba(15, 118, 110, 0.08)",
+      borderColor: themeColors.value.net,
+      backgroundColor: themeColors.value.net,
       borderWidth: 2,
       tension: 0.2,
       fill: false,
@@ -123,8 +127,8 @@ const chartData = computed(() => ({
     {
       label: "台股資產",
       data: normalizedRows.value.map((row) => row.twValueTwd),
-      borderColor: "#3b82f6",
-      backgroundColor: "rgba(59, 130, 246, 0.08)",
+      borderColor: themeColors.value.asset,
+      backgroundColor: themeColors.value.asset,
       borderWidth: 2,
       tension: 0.2,
       fill: false,
@@ -134,8 +138,8 @@ const chartData = computed(() => ({
     {
       label: "美股資產（折 TWD）",
       data: normalizedRows.value.map((row) => row.usValueTwd),
-      borderColor: "#64748b",
-      backgroundColor: "rgba(100, 116, 139, 0.08)",
+      borderColor: themeColors.value.liability,
+      backgroundColor: themeColors.value.liability,
       borderWidth: 2,
       tension: 0.2,
       fill: false,
@@ -158,7 +162,7 @@ const chartOptions = computed(() => ({
     tooltip: {
       backgroundColor: themeColors.value.surface,
       titleColor: themeColors.value.main,
-      bodyColor: themeColors.value.text,
+      bodyColor: themeColors.value.main,
       borderColor: themeColors.value.border,
       borderWidth: 1,
       padding: 10,
@@ -236,16 +240,16 @@ const chartOptions = computed(() => ({
     <div class="trend-metrics">
       <div>
         <div class="muted-label">區間最新總市值 <span class="currency-badge">TWD</span></div>
-        <div class="trend-metric-value">{{ latestRow ? formatTwd(latestRow.totalValueTwd) : '—' }}</div>
+        <div class="trend-metric-value" :class="amountColor(latestRow?.totalValueTwd)">{{ latestRow ? formatTwd(latestRow.totalValueTwd) : '—' }}</div>
       </div>
       <div>
         <div class="muted-label">台股市值（TWD）</div>
-        <div class="trend-metric-value">{{ latestRow ? formatTwd(latestRow.twValueTwd) : '—' }}</div>
+        <div class="trend-metric-value" :class="amountColor(latestRow?.twValueTwd)">{{ latestRow ? formatTwd(latestRow.twValueTwd) : '—' }}</div>
       </div>
       <div>
         <div class="muted-label">美股市值（折 TWD）</div>
-        <div class="trend-metric-value">{{ latestRow ? formatTwd(latestRow.usValueTwd) : '—' }}</div>
-        <div v-if="latestRow" class="muted-label">原幣 USD {{ latestRow.usValue.toLocaleString('en-US', { maximumFractionDigits: 2 }) }}</div>
+        <div class="trend-metric-value" :class="amountColor(latestRow?.usValueTwd)">{{ latestRow ? formatTwd(latestRow.usValueTwd) : '—' }}</div>
+        <div v-if="latestRow" class="muted-label">原幣 USD <span :class="amountColor(latestRow.usValue)">{{ latestRow.usValue.toLocaleString('en-US', { maximumFractionDigits: 2 }) }}</span></div>
       </div>
     </div>
     <p v-if="latestRow" class="trend-note muted-label">{{ latestRow.label }} · TWD</p>
@@ -271,7 +275,8 @@ const chartOptions = computed(() => ({
 .trend-date:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .trend-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding-block: 14px; border-block: 1px solid var(--line-soft); }
 .trend-metrics .muted-label { font-size: 11px; line-height: 1.7; }
-.trend-metric-value { margin: 5px 0 2px; color: var(--text-main); font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.trend-metric-value { margin: 5px 0 2px; font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.text-main { color: var(--text-main); }
 .trend-note { font-size: 11px; line-height: 1.7; margin: 12px 0 16px; }
 .trend-chart { position: relative; height: 280px; min-height: 0; }
 .trend-empty { height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px; border: 1px dashed var(--line-soft); border-radius: 6px; color: var(--text-sub); font-size: 13px; text-align: center; line-height: 1.7; }
