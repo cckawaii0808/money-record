@@ -114,7 +114,9 @@ export async function searchStocks(query: string, market?: string) {
  */
 export async function fetchStockPrice(symbol: string): Promise<number | null> {
   const prices = await fetchMultipleStockPrices([symbol]);
-  return prices[symbol] ?? null;
+  // 後端會將 2330.TW / 2330.TWO 正規化為 2330，查詢時需同步處理
+  const normalized = symbol.trim().toUpperCase().replace(/\.TWO?$/, "");
+  return prices[symbol] ?? prices[normalized] ?? null;
 }
 
 /**
